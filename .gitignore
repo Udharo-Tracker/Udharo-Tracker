@@ -1,0 +1,62 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =====================
+# Virtual Environment
+# =====================
+venv/
+env/
+ENV/
+.venv/
+
+# =====================
+# Django
+# =====================
+*.log
+db.sqlite3
+db.sqlite3-journal
+
+# Media files (uploads - depends on project)
+media/
+
+# Local settings (if you use separate config)
+local_settings.py
+
+# =====================
+# Environment variables (SECRETS)
+# =====================
+.env
+.env.*
+!.env.example
+
+# =====================
+# Testing / Coverage
+# =====================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# =====================
+# Migrations cache (not migrations themselves)
+# =====================
+*.pyc
+__pycache__
+
+# =====================
+# OS / Editor
+# =====================
+.DS_Store
+.vscode/
+.idea/
+
+# =====================
+# Static build artifacts (if used)
+# =====================
+staticfiles/
