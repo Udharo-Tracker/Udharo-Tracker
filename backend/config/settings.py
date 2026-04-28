@@ -45,8 +45,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
      "drf_spectacular",
     'rest_framework',
-    'shops',
-    'ledger',
+    'apps.shops',
+    'apps.ledger',
 ]
 
 MIDDLEWARE = [
