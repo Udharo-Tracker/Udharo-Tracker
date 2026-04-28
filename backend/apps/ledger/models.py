@@ -1,5 +1,5 @@
 from django.db import models
-from shops.models import Customer
+from apps.shops.models import Customer
 
 
 # Create your models here.
