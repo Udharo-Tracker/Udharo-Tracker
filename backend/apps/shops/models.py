@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 # Create your models here.
 class Shop(models.Model):
-    owner = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shop')
+    owner = models.ForeignKey("account.User", on_delete=models.CASCADE, related_name='shop')
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
