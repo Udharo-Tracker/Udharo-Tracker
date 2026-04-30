@@ -1,10 +1,9 @@
 from django.db import models
-from django.contrib.auth.models import User
-
+from django.conf import settings
 
 # Create your models here.
 class Shop(models.Model):
-    owner = models.ForeignKey("account.User", on_delete=models.CASCADE, related_name='shop')
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shop')
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
