@@ -1,79 +1,126 @@
-from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.utils.translation import gettext_lazy as _
-from apps.shared.files_utils import FileSizeValidator, file_upload_path
-from django.contrib.auth.base_user import BaseUserManager
 import uuid
+import re
 
-# Create your models here.
-class User(AbstractUser):
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.utils.translation import gettext_lazy as _
+
+from apps.shared.abstract_base_model import AbstractBaseModel
+from apps.shared.files_utils import file_upload_path, FileSizeValidator, validate_phone
+
+
+
+
+# =========================
+# USER MANAGER (REQUIRED)
+# =========================
+
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email is required")
+
+        email = self.normalize_email(email).strip().lower()
+
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        return self.create_user(email, password, **extra_fields)
+
+
+# =========================
+# USER MODEL
+# =========================
+
+class User(AbstractBaseUser, PermissionsMixin, AbstractBaseModel):
+
     class GenderChoices(models.TextChoices):
-        MALE = 'male', 'Male'
-        FEMALE = 'female', 'Female'          
-        OTHER = 'others', 'Others'
-    
-    class UserStatusChoices(models.TextChoices):
-        ACTIVE = "active", "Active"
-        INACTIVE = "inactive", "Inactive"
-        SUSPENDED = "suspended", "Suspended"
-        
-    username = models.CharField(
-        _("username"),
-        max_length=150,
-        unique=True,
-        blank=True,
-        null=True,
-        validators=[AbstractUser.username_validator],
-        error_messages={
-            "unique": _("A user with that username already exists."),
-        },
-    )
+        MALE = "male", "Male"
+        FEMALE = "female", "Female"
+        OTHER = "other", "Other"
 
-    email = models.EmailField(unique=True)
-    is_email_verified = models.BooleanField(default=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    password = models.CharField(max_length=128)
-    is_phone_verified = models.BooleanField(default=False)
+    # core auth
+    email = models.EmailField(_("email address"), unique=True)
+    username = models.CharField(max_length=150, blank=True, null=True)
 
-    # personal details
-    first_name = models.CharField(_("first name"), max_length=150, blank=False)
-    last_name = models.CharField(_("last name"), max_length=150, blank=False)
+    # profile
     gender = models.CharField(
-        max_length=10, choices=GenderChoices.choices, blank=True, null=True
+        max_length=10,
+        choices=GenderChoices.choices,
+        blank=True,
+        null=True
     )
-    date_of_birth = models.DateField(_("date of birth"), null=True, blank=True)
+
+    date_of_birth = models.DateField(blank=True, null=True)
+
     profile_picture = models.ImageField(
         upload_to=file_upload_path,
         validators=[FileSizeValidator(1 * 1024 * 1024)],
         null=True,
         blank=True,
     )
-    is_developer = models.BooleanField(default=False)
-    status = models.CharField(
-    max_length=20,
-    choices=UserStatusChoices.choices,
-    default=UserStatusChoices.ACTIVE,
+
+    # 🇳🇵 Nepal phone number support
+    phone_number = models.CharField(
+        max_length=15,
+        default="+9779000000000",
+        validators=[validate_phone],
     )
 
-    # Metadata
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # auth flags
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
 
+    # login field
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
-    def __str__(self):
-        return self.email
+    objects = UserManager()
 
     class Meta:
         db_table = "users"
 
+    def __str__(self):
+        return self.email
 
+    # =========================
+    # CLEAN SAVE LOGIC
+    # =========================
     def save(self, *args, **kwargs):
-        if self.email:
-            self.email = BaseUserManager().normalize_email(self.email)
 
+        # email normalize
+        if self.email:
+            self.email = self.email.strip().lower()
+
+        # auto username fallback (internal use only)
         if not self.username:
-            self.username = uuid.uuid4().hex[:30]
+            self.username = str(uuid.uuid4())[:30]
+
+        # 🇳🇵 Nepal phone normalization (+977)
+        if self.phone_number:
+            phone = re.sub(r"[\s\-]", "", self.phone_number)
+
+            # already international format
+            if phone.startswith("+"):
+                self.phone_number = phone
+
+            # Nepal local format handling
+            elif phone.startswith("977"):
+                self.phone_number = f"+{phone}"
+
+            elif phone.startswith("0"):
+                self.phone_number = f"+977{phone[1:]}"
+
+            else:
+                self.phone_number = f"+977{phone}"
 
         super().save(*args, **kwargs)
