@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 
 from django.core.exceptions import ValidationError
@@ -31,3 +32,14 @@ def file_upload_path(instance, filename):
     else:
         _, file_extension = os.path.splitext(filename)
         return f"shared/{instance._meta.model_name}/{uuid.uuid4()}{file_extension}"
+
+
+def validate_phone(value):
+    # remove spaces and dashes
+    value = re.sub(r"[\s\-]", "", value)
+
+    # Nepal pattern
+    pattern = r"^(?:\+977|977)?9[6-8]\d{8}$"
+
+    if not re.fullmatch(pattern, value):
+        raise ValidationError("Enter a valid Nepali phone number")
