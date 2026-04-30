@@ -16,12 +16,9 @@ class UserProfileSerializers(serializers.ModelSerializer):
             "date_of_birth",
             "profile_picture",
             "phone_number",
-            "preferred_charity",
-            "is_anonymous_donor",
             "is_active",
             "is_insurance_agent",
             "created_at",
             "updated_at",
-            "preferred_charity_id",
         ]
         read_only_fields = ["is_active"]
