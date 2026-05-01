@@ -17,8 +17,12 @@ class UserProfileSerializers(serializers.ModelSerializer):
             "profile_picture",
             "phone_number",
             "is_active",
-            "is_insurance_agent",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["is_active"]
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["full_name"] = f"{instance.first_name} {instance.last_name}"
+        return data

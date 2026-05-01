@@ -53,6 +53,8 @@ class User(AbstractBaseUser, PermissionsMixin, AbstractBaseModel):
     username = models.CharField(max_length=150, blank=True, null=True)
 
     # profile
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
     gender = models.CharField(
         max_length=10,
         choices=GenderChoices.choices,
