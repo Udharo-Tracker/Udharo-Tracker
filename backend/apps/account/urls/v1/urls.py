@@ -16,7 +16,7 @@ router = DefaultRouter()
 
 # user
 router.register(
-    r"user/cregister",
+    r"user/register",
     UserRegisterViewSet,
     basename="user-register",
 )
@@ -26,7 +26,7 @@ urlpatterns = [
     path("", include(router.urls)),
     # auth
     path(
-        "auth/ctoken/",
+        "auth/token/",
         CustomTokenObtainPairView.as_view(),
         name="token_obtain_pair",
     ),
@@ -43,7 +43,7 @@ urlpatterns = [
         name="user-password",
     ),
     path(
-        "user/cforgot-password/",
+        "user/forgot-password/",
         UserForgotPasswordViewSet.as_view(),
         name="user-forgot-password",
     ),
