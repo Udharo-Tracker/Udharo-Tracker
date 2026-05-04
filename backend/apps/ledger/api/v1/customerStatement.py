@@ -2,12 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Sum, Value, CharField, F
 from itertools import chain
+from rest_framework import permissions
 
 from apps.shops.models import Customer
-from .models import UdharoEntry, Payment
+from ...models import UdharoEntry, Payment
 
 
 class CustomerStatementView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request, customer_id):
         # ---------------------------
         # 1. Get Customer + Shop
