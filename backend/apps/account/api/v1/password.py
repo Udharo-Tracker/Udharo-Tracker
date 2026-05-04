@@ -34,8 +34,7 @@ class UserForgotPasswordViewSet(generics.GenericAPIView):
         return Response({"message": "Successfully sent password reset email."})
 
 
-class UserPasswordResetViewSet(generics.UpdateAPIView):
-    queryset = User.objects.none()
+class UserPasswordResetViewSet(generics.GenericAPIView):
     serializer_class = UserPasswordResetSerializer
 
     def post(self, request, *args, **kwargs):

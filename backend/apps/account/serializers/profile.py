@@ -16,11 +16,10 @@ class UserProfileSerializers(serializers.ModelSerializer):
             "date_of_birth",
             "profile_picture",
             "phone_number",
-            "is_active",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["is_active"]
+        read_only_fields = ["id", "email", "created_at", "updated_at"]
     
     def to_representation(self, instance):
         data = super().to_representation(instance)
