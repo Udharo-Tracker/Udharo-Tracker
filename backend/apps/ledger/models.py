@@ -1,4 +1,6 @@
 from django.db import models
+import uuid
+
 from apps.shops.models import Customer
 
 
@@ -17,6 +19,11 @@ class UdharoEntry(models.Model):
 
 
 class Payment(models.Model):
+    id = models.UUIDField(
+    primary_key=True,
+    default=uuid.uuid4,
+    editable=False
+    )
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='payments')
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     note = models.TextField(blank=True)
