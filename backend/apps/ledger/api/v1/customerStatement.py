@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from django.db.models import Sum, Value, CharField, F
 from itertools import chain
 from rest_framework import permissions
+from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
 
 from apps.shops.models import Customer
 from ...models import UdharoEntry, Payment
@@ -15,7 +17,14 @@ class CustomerStatementView(APIView):
         # ---------------------------
         # 1. Get Customer + Shop
         # ---------------------------
-        customer = Customer.objects.select_related("shop").get(id=customer_id)
+        customer = get_object_or_404(
+        Customer.objects.select_related("shop__owner"), 
+        id=customer_id
+        )
+
+        if customer.shop.owner != request.user:
+            raise PermissionDenied("You do not have access to this customer.")
+
         shop = customer.shop
 
         # ---------------------------
@@ -36,12 +45,13 @@ class CustomerStatementView(APIView):
         # ---------------------------
         # 3. Normalize Transactions
         # ---------------------------
+        # UdharoEntry — remove the redundant amount annotation
         udharo_qs = UdharoEntry.objects.filter(customer=customer).annotate(
             type=Value("udharo", output_field=CharField()),
-            amount=F("amount"),
             date=F("created_at"),
         ).values("id", "type", "amount", "date", "note")
 
+        # Payment — keep the rename, it's correct
         payment_qs = Payment.objects.filter(customer=customer).annotate(
             type=Value("payment", output_field=CharField()),
             amount=F("amount_paid"),
@@ -82,12 +92,12 @@ class CustomerStatementView(APIView):
         # ---------------------------
         response = {
             "customer": {
-                "id": str(customer.id),
+                "id": customer.id,
                 "name": customer.name,
                 "phone": getattr(customer, "phone", None),
             },
             "shop": {
-                "id": str(shop.id),
+                "id": shop.id,
                 "name": shop.name,
             },
             "summary": {
