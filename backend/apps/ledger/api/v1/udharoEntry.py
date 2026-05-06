@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema
-
+from django.core.cache import cache
 
 from ...models import UdharoEntry
 from ...serializers.udharoEntry import UdharoEntrySerializer
@@ -21,4 +21,5 @@ class UdharoEntryViewSet(viewsets.ModelViewSet):
         if customer.shop.owner != self.request.user:
             raise PermissionDenied("You don't own this customer.")
 
+        cache.delete(f"ledger_summary_{self.request.user.id}")
         serializer.save()

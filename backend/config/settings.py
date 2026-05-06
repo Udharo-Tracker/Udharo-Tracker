@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
-
+from decouple import config
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -156,4 +156,14 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "This is an API for Udharo Tracker (Debt Management Apps)",
     "VERSION": "1.0.0",
      'SERVE_INCLUDE_SCHEMA': False,
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
 }
