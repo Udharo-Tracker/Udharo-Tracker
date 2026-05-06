@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from drf_spectacular.utils import extend_schema
+from django.core.cache import cache
 
 from ...models import Payment
 from ...serializers.payment import PaymentSerializer
@@ -44,4 +45,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
 
         with transaction.atomic():
-            serializer.save()
+            serializer.save()            
+        
+        cache.delete(f"ledger_summary_{self.request.user.id}")
