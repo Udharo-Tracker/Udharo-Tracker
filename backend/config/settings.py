@@ -44,8 +44,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-     "drf_spectacular",
+    "drf_spectacular",
     'rest_framework',
+    'django_celery_beat',
     'apps.account',
     'apps.shops',
     'apps.ledger',
@@ -167,3 +168,9 @@ CACHES = {
         }
     }
 }
+
+
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
+CELERY_TIMEZONE = 'Asia/Kathmandu'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
