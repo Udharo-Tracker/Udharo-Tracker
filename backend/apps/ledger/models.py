@@ -31,3 +31,16 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.customer.name} - Rs.{self.amount_paid}"
+    
+
+
+class ReminderLog(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='reminder_log')
+    sent_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True)
+    outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2)
