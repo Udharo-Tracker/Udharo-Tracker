@@ -19,7 +19,7 @@ urlpatterns = [
     name="customer-statement",
     ),
     path(
-    "/ledger/summary/",
+    "ledger/summary/",
     LedgerSummaryView.as_view(),
     name="ledger-summary",
     ),
