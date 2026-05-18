@@ -8,6 +8,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.shops.models import Customer
 from ...models import UdharoEntry, Payment
+from ...serializers.udharoEntry import UdharoEntrySerializer
 
 
 class CustomerStatementView(APIView):
@@ -25,14 +26,16 @@ class CustomerStatementView(APIView):
         if customer.shop.owner != request.user:
             raise PermissionDenied("You do not have access to this customer.")
 
-        shop = customer.shop
+        udharo_entries = UdharoEntry.objects.prefetch_related(
+        'items'
+        ).filter(customer=customer)
 
         # ---------------------------
         # 2. Totals (DB-level, efficient)
         # ---------------------------
         total_udharo = (
             UdharoEntry.objects.filter(customer=customer)
-            .aggregate(total=Sum("amount"))["total"] or 0
+            .aggregate(total=Sum("items__amount"))["total"] or 0
         )
 
         total_paid = (
@@ -49,6 +52,7 @@ class CustomerStatementView(APIView):
         udharo_qs = UdharoEntry.objects.filter(customer=customer).annotate(
             type=Value("udharo", output_field=CharField()),
             date=F("created_at"),
+            amount=Sum("items__amount"),
         ).values("id", "type", "amount", "date", "note")
 
         # Payment — keep the rename, it's correct
@@ -96,15 +100,12 @@ class CustomerStatementView(APIView):
                 "name": customer.name,
                 "phone": getattr(customer, "phone", None),
             },
-            "shop": {
-                "id": shop.id,
-                "name": shop.name,
-            },
             "summary": {
                 "total_udharo": total_udharo,
                 "total_paid": total_paid,
                 "outstanding_balance": outstanding_balance,
             },
+            "udharo_entries": UdharoEntrySerializer(udharo_entries, many=True).data,
             "transactions": transactions,
         }
 
