@@ -20,7 +20,7 @@ def send_daily_reminders():
         customer=OuterRef('pk'),
         is_settled=False
         ).values('customer').annotate(
-            total=Sum('amount')
+            total=Sum('items__amount')
         ).values('total')
 
     payment_sum = Payment.objects.filter(

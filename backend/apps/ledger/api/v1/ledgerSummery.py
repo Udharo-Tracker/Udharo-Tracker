@@ -11,6 +11,7 @@ from apps.shops.models import Customer
 from apps.ledger.models import UdharoEntry
 from apps.ledger.models import Payment
 
+
 class LedgerSummaryView(APIView):
 
     permission_classes = [permissions.IsAuthenticated]
@@ -33,7 +34,7 @@ class LedgerSummaryView(APIView):
         customer=OuterRef('pk'),
         is_settled=False
         ).values('customer').annotate(
-            total=Sum('amount')
+            total=Sum('items__amount')
         ).values('total')
 
         payment_sum = Payment.objects.filter(
@@ -112,6 +113,7 @@ class LedgerSummaryView(APIView):
             "total_outstanding": total_outstanding,
             "customers_summary": customers_summary
         }
+
         cache.set(cache_key, content, timeout=300)
         return Response(content)
 
