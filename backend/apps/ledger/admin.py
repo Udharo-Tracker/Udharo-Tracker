@@ -6,7 +6,7 @@ from .models import UdharoEntry, Payment
 
 @admin.register(UdharoEntry)
 class UdharoEntryAdmin(admin.ModelAdmin):
-    list_display = ['customer', 'amount', 'is_settled', 'created_at', 'settled_at']
+    list_display = ['customer', 'is_settled', 'created_at', 'settled_at']
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
