@@ -6,6 +6,9 @@ from apps.ledger.api.v1.payment import PaymentViewSet
 from apps.ledger.api.v1.udharoEntry import UdharoEntryViewSet
 from apps.ledger.api.v1.customerStatement import CustomerStatementView
 from apps.ledger.api.v1.ledgerSummery import LedgerSummaryView
+from apps.ledger.api.v1.CreditScore import CustomerCreditScoreHistoryView, CustomerCreditScoreView
+from apps.ledger.api.v1.Dashboard import DashboardView
+
 
 router = DefaultRouter()
 router.register(r'udharo', UdharoEntryViewSet, basename='udharo')
@@ -23,4 +26,7 @@ urlpatterns = [
     LedgerSummaryView.as_view(),
     name="ledger-summary",
     ),
+    path("customers/<uuid:customer_id>/credit-score/", CustomerCreditScoreView.as_view(), name="customer-credit-score"),
+    path("customers/<uuid:customer_id>/credit-score/history/", CustomerCreditScoreHistoryView.as_view(), name="customer-credit-score-history"),
+    path("ledger/dashboard/", DashboardView.as_view(), name="dashboard")
 ]
