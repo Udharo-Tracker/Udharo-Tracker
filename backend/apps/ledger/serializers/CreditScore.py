@@ -8,8 +8,7 @@ class CreditScoreSerializer(serializers.ModelSerializer):
         'customer',
         'calculated_at',
         'score',
-        'validators',
         'risk_level']
-        read_ony_fields = ['score', 'calculated_at', 'risk_level']
+        read_only_fields = ['score', 'calculated_at', 'risk_level']
     
     
