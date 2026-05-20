@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from decouple import config
 from dotenv import load_dotenv
+from celery.schedules import crontab
 
 # Load environment variables from .env file
 load_dotenv(override=True)
@@ -174,3 +175,10 @@ CELERY_BROKER_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
 CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
 CELERY_TIMEZONE = 'Asia/Kathmandu'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+CELERY_BEAT_SCHEDULE = {
+    'send-daily-reminders': {
+        'task': 'apps.ledger.tasks.reminderLog.send_daily_reminders',
+        'schedule': crontab(hour=9, minute=0),  # 9:00 AM Asia/Kathmandu daily
+    },
+}
