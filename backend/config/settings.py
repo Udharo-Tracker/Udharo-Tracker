@@ -181,4 +181,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.ledger.tasks.reminderLog.send_daily_reminders',
         'schedule': crontab(hour=9, minute=0),  # 9:00 AM Asia/Kathmandu daily
     },
+    'recalculate-credit-scores-daily': {
+        'task': 'apps.ledger.tasks.creditScore.recalculate_all_credit_scores',
+        'schedule': crontab(hour=0, minute=0),  # runs daily at midnight
+    },
 }
