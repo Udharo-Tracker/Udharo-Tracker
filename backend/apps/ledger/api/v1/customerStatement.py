@@ -5,12 +5,17 @@ from itertools import chain
 from rest_framework import permissions
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
+from drf_spectacular.utils import extend_schema
+
 
 from apps.shops.models import Customer
 from ...models import UdharoEntry, Payment
 from ...serializers.udharoEntry import UdharoEntrySerializer
 
 
+@extend_schema(
+    tags=["Customer Statement"],
+)
 class CustomerStatementView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

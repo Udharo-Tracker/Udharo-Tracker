@@ -2,9 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
 from django.core.cache import cache
+from drf_spectacular.utils import extend_schema
 
 from ...tasks.services import get_customers_with_balance
 
+@extend_schema(
+    tags=["Ledger Summary"],
+)
 class LedgerSummaryView(APIView):
 
     permission_classes = [permissions.IsAuthenticated]
