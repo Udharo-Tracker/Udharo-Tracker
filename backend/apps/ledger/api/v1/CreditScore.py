@@ -3,13 +3,16 @@ from rest_framework.response import Response
 from rest_framework import permissions
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
+from drf_spectacular.utils import extend_schema
 
 
 from apps.shops.models import Customer
 from ...models import CreditScore
 from ...serializers.CreditScore import CreditScoreSerializer
 
-
+@extend_schema(
+    tags=["Customer Credit Score"],
+)
 class CustomerCreditScoreView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
