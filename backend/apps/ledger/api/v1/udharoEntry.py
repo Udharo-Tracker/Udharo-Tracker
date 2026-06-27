@@ -17,16 +17,27 @@ class UdharoEntryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
 
+    def _clear_user_cache(self):
+        cache.delete(f"ledger_summary_{self.request.user.id}")
+        cache.delete(f"dashboard_{self.request.user.id}")
+
     def perform_create(self, serializer):
         customer = serializer.validated_data["customer"]
 
         if customer.shop.owner != self.request.user:
             raise PermissionDenied("You don't own this customer.")
-        
+
         with transaction.atomic():
             serializer.save()
             calculate_credit_score(customer)
-       
-        cache.delete(f"ledger_summary_{self.request.user.id}")
-        cache.delete(f"dashboard_{self.request.user.id}")
+
+        self._clear_user_cache()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        self._clear_user_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        self._clear_user_cache()
         

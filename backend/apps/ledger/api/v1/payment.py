@@ -68,5 +68,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
             calculate_credit_score(customer)         
         
+        self._clear_user_cache()
+
+    def _clear_user_cache(self):
         cache.delete(f"ledger_summary_{self.request.user.id}")
         cache.delete(f"dashboard_{self.request.user.id}")
+
+    def perform_update(self, serializer):
+        serializer.save()
+        self._clear_user_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        self._clear_user_cache()
