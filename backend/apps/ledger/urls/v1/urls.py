@@ -9,6 +9,7 @@ from apps.ledger.api.v1.ledgerSummery import LedgerSummaryView
 from apps.ledger.api.v1.CreditScore import CustomerCreditScoreHistoryView, CustomerCreditScoreView
 from apps.ledger.api.v1.Dashboard import DashboardView
 from apps.ledger.api.v1.monthlyReport import MonthlyReportView
+from apps.ledger.api.v1.ReminderLog import ReminderLogView
 
 
 router = DefaultRouter()
@@ -31,4 +32,5 @@ urlpatterns = [
     path("customers/<uuid:customer_id>/credit-score/history/", CustomerCreditScoreHistoryView.as_view(), name="customer-credit-score-history"),
     path("ledger/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("ledger/monthly-report/", MonthlyReportView.as_view(), name="monthly-report"),
+    path("customers/<uuid:customer_id>/reminders/", ReminderLogView.as_view(), name="reminder-log"),
 ]

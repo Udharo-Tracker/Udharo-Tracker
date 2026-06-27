@@ -12,7 +12,7 @@ from ...models import UdharoEntry, Payment
 
 
 @extend_schema(
-    tags=["Reports"],
+    tags=["Monthly Reports"],
     parameters=[
         OpenApiParameter("year", int, description="Year (required)", required=True),
         OpenApiParameter("month", int, description="Month 1-12 (optional — omit for yearly summary)"),

@@ -4,11 +4,12 @@ from rest_framework import permissions
 from django.db.models import Sum
 from django.utils import timezone
 from django.core.cache import cache
-
+from drf_spectacular.utils import extend_schema
 
 from ...models import  UdharoEntry
 from ...tasks.services import get_customers_with_balance
 
+@extend_schema(tags=["Dashboard"])
 class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
