@@ -11,7 +11,7 @@ from ...models import CreditScore
 from ...serializers.CreditScore import CreditScoreSerializer
 
 @extend_schema(
-    tags=["Customer Credit Score"],
+    tags=["Customers"],
 )
 class CustomerCreditScoreView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -34,7 +34,7 @@ class CustomerCreditScoreView(APIView):
         return Response(serializer.data)
     
 
-
+@extend_schema(tags=["Customers"])
 class CustomerCreditScoreHistoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
