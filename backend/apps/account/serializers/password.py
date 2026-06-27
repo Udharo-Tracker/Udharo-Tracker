@@ -60,13 +60,14 @@ class UserForgotPasswordSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         try:
-            user = User.objects.get(email=value)
+            return User.objects.get(email=value)
         except User.DoesNotExist:
-            raise serializers.ValidationError("User with this email does not exist.")
-        return user
+            return None
 
     def save(self):
         user = self.validated_data["email"]
+        if user is None:
+            return
         # send_password_reset_email(user, self.context.get("request"))
 
 

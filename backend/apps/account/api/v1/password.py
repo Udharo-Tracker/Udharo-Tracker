@@ -1,5 +1,5 @@
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from ...models import User
@@ -25,17 +25,19 @@ class UserUpdatePasswordViewSet(generics.UpdateAPIView):
 
 class UserForgotPasswordViewSet(generics.GenericAPIView):
     serializer_class = UserForgotPasswordSerializer
+    permission_classes = [AllowAny]
     throttle_scope = "forgot_password"
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"message": "Successfully sent password reset email."})
+        return Response({"message": "If that email is registered, a reset link has been sent."})
 
 
 class UserPasswordResetViewSet(generics.GenericAPIView):
     serializer_class = UserPasswordResetSerializer
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
