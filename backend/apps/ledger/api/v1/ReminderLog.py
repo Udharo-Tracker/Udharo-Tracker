@@ -4,6 +4,7 @@ from rest_framework import permissions, status
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from drf_spectacular.utils import extend_schema
+from django.db.models import Sum
 
 from apps.shops.models import Customer
 from ...models import ReminderLog
@@ -29,8 +30,32 @@ class ReminderLogView(APIView):
 
         if customer.shop.owner != request.user:
             raise PermissionDenied()
+        
 
-        serializer = ReminderLogSerializer(data={**request.data, 'customer': customer.id})
-        serializer.is_valid(raise_exception=True)
-        serializer.save(customer=customer)
+        # Calculate balance automatically
+        total_udharo = customer.udharo_entries.filter(
+            is_settled=False
+        ).aggregate(total=Sum('items__amount'))['total'] or 0
+
+        total_paid = customer.payments.aggregate(
+            total=Sum('amount_paid')
+        )['total'] or 0
+
+        outstanding_balance = total_udharo - total_paid
+
+        if outstanding_balance <= 0:
+            return Response(
+                {"detail": "Customer has no outstanding balance."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        note = request.data.get('note', '')
+
+        reminder = ReminderLog.objects.create(
+            customer=customer,
+            outstanding_balance=outstanding_balance,
+            note=note
+        )
+
+        serializer = ReminderLogSerializer(reminder)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
