@@ -4,7 +4,8 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncMonth, TruncDate
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 import calendar
 
@@ -16,7 +17,60 @@ from ...models import UdharoEntry, Payment
     parameters=[
         OpenApiParameter("year", int, description="Year (required)", required=True),
         OpenApiParameter("month", int, description="Month 1-12 (optional — omit for yearly summary)"),
-    ]
+    ],
+    responses=OpenApiResponse(
+        response=OpenApiTypes.OBJECT,
+        description="Yearly summary (12 months) when `month` is omitted, or a daily breakdown when `month` is given.",
+        examples=[
+            OpenApiExample(
+                "Yearly summary (no month param)",
+                value={
+                    "year": 2026,
+                    "months": [
+                        {
+                            "month": 7,
+                            "month_name": "July",
+                            "total_udharo": 8000.0,
+                            "total_payments": 5000.0,
+                            "net": 3000.0,
+                            "entry_count": 4,
+                            "payment_count": 3,
+                        }
+                    ],
+                    "yearly_totals": {
+                        "total_udharo": 42000.0,
+                        "total_payments": 26800.0,
+                        "net": 15200.0,
+                    },
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "Month detail (month param given)",
+                value={
+                    "year": 2026,
+                    "month": 7,
+                    "month_name": "July",
+                    "daily_breakdown": [
+                        {
+                            "date": "2026-07-15",
+                            "total_udharo": 1500.0,
+                            "total_payments": 500.0,
+                            "net": 1000.0,
+                            "entry_count": 1,
+                            "payment_count": 1,
+                        }
+                    ],
+                    "totals": {
+                        "total_udharo": 8000.0,
+                        "total_payments": 5000.0,
+                        "net": 3000.0,
+                    },
+                },
+                response_only=True,
+            ),
+        ],
+    ),
 )
 class MonthlyReportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
