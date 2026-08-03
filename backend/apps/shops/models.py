@@ -28,6 +28,12 @@ class Customer(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='customers')
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=15, blank=True)
+    email = models.EmailField(blank=True)
+    address = models.TextField(blank=True)
+    credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    credit_term_days = models.PositiveIntegerField(default=0)
+    loyalty_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    opening_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
