@@ -200,6 +200,12 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# Dotted path to the SMS backend class used by apps.ledger.services.sms.send_sms().
+# Defaults to the free console backend (logs the message, sends nothing) so no paid
+# gateway account is needed for local dev/testing. Swap in a real backend via env var
+# once a provider is chosen.
+SMS_BACKEND = config("SMS_BACKEND", default="apps.ledger.services.sms.ConsoleSMSBackend")
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
@@ -221,3 +227,30 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = 'DENY'
+
+# Without this, INFO-level logger.info() calls in apps/* (e.g. ConsoleSMSBackend)
+# are silently dropped: Django only auto-configures its own 'django.*' loggers,
+# and the root logger's default threshold is WARNING with no handler attached.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

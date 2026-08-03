@@ -60,10 +60,17 @@ class ReminderLog(models.Model):
         default=uuid.uuid4,
         editable=False
     )
+    class Channel(models.TextChoices):
+        NOTE = "note", "Note"
+        SMS = "sms", "SMS"
+        AUTO = "auto", "Automatic"
+
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='reminder_log')
     sent_at = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True)
     outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2)
+    channel = models.CharField(max_length=10, choices=Channel.choices, default=Channel.NOTE)
+    delivery_status = models.CharField(max_length=10, blank=True)
 
 
 class CreditScore(models.Model):

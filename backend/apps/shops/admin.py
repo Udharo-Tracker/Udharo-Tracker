@@ -11,4 +11,4 @@ class ShopAdmin(admin.ModelAdmin):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ['name', 'shop', 'phone', 'created_at']
+    list_display = ['name', 'shop', 'phone', 'credit_limit', 'created_at']

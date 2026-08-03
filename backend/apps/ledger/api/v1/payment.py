@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.core.cache import cache
 from django.utils import timezone
 
@@ -10,13 +10,30 @@ from ...models import Payment
 from ...serializers.payment import PaymentSerializer
 from ...tasks.services import calculate_credit_score
 
-@extend_schema(tags=["Payments"])
+@extend_schema(
+    tags=["Payments"],
+    parameters=[
+        OpenApiParameter(
+            name="customer_id",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter payments by customer UUID.",
+        ),
+    ],
+)
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Payment.objects.filter(customer__shop__owner=self.request.user)
+        queryset = Payment.objects.filter(customer__shop__owner=self.request.user)
+
+        customer_id = self.request.query_params.get("customer_id")
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+
+        return queryset
 
     def perform_create(self, serializer):
         customer = serializer.validated_data["customer"]

@@ -10,6 +10,18 @@ from apps.ledger.models import UdharoEntry, Payment
 from ..models import CreditScore
 
 
+def get_outstanding_balance(customer):
+    total_udharo = customer.udharo_entries.filter(
+        is_settled=False
+    ).aggregate(total=Sum('items__amount'))['total'] or 0
+
+    total_paid = customer.payments.aggregate(
+        total=Sum('amount_paid')
+    )['total'] or 0
+
+    return customer.opening_balance + total_udharo - total_paid
+
+
 def calculate_credit_score(customer):
     now = timezone.now()
     thirty_days_ago = now - timedelta(days=30)
@@ -37,7 +49,7 @@ def calculate_credit_score(customer):
         total=Sum('amount_paid')
     )['total'] or 0
 
-    outstanding = total_udharo - total_paid
+    outstanding = customer.opening_balance + total_udharo - total_paid
     
 
     # Apply deductions
@@ -111,7 +123,7 @@ def get_customers_with_balance(user):
         output_field=DecimalField()
         ),
         outstanding_balance=ExpressionWrapper(
-        F('total_udharo') - F('total_paid'),
+        F('opening_balance') + F('total_udharo') - F('total_paid'),
         output_field=DecimalField()
         ),
         last_udharo=Max('udharo_entries__created_at'),
