@@ -10,6 +10,18 @@ from apps.ledger.models import UdharoEntry, Payment
 from ..models import CreditScore
 
 
+def get_outstanding_balance(customer):
+    total_udharo = customer.udharo_entries.filter(
+        is_settled=False
+    ).aggregate(total=Sum('items__amount'))['total'] or 0
+
+    total_paid = customer.payments.aggregate(
+        total=Sum('amount_paid')
+    )['total'] or 0
+
+    return total_udharo - total_paid
+
+
 def calculate_credit_score(customer):
     now = timezone.now()
     thirty_days_ago = now - timedelta(days=30)

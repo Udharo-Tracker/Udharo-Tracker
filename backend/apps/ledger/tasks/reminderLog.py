@@ -55,7 +55,8 @@ def send_daily_reminders():
         ReminderLog.objects.create(
             customer=customer,
             outstanding_balance=customer.outstanding_balance,
-            note=f"Daily reminder for outstanding balance: Rs.{customer.outstanding_balance}"
+            note=f"Daily reminder for outstanding balance: Rs.{customer.outstanding_balance}",
+            channel=ReminderLog.Channel.AUTO,
         )
 
     return f"Sent reminders to {queryset.count()} customers"
