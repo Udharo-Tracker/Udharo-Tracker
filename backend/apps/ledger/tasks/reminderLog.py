@@ -45,7 +45,7 @@ def send_daily_reminders():
             output_field=DecimalField()
             ),
             outstanding_balance=ExpressionWrapper(
-            F('total_udharo') - F('total_paid'),
+            F('opening_balance') + F('total_udharo') - F('total_paid'),
             output_field=DecimalField()
             ),
         ).filter(outstanding_balance__gt=0).distinct()
