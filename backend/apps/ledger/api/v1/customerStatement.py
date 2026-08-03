@@ -10,6 +10,7 @@ from drf_spectacular.types import OpenApiTypes
 
 
 from apps.shops.models import Customer
+from apps.shops.serializers.customer import CustomerSerializer
 from ...models import UdharoEntry, Payment
 from ...serializers.udharoEntry import UdharoEntrySerializer
 
@@ -27,6 +28,13 @@ from ...serializers.udharoEntry import UdharoEntrySerializer
                         "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                         "name": "Ram Sharma",
                         "phone": "+9779812345678",
+                        "email": "ram.sharma@example.com",
+                        "address": "Baneshwor, Kathmandu",
+                        "credit_limit": 10000.0,
+                        "credit_term_days": 30,
+                        "loyalty_discount": 5.0,
+                        "opening_balance": 0.0,
+                        "created_at": "2026-07-01T09:15:00+05:45",
                     },
                     "summary": {
                         "total_udharo": 5000.0,
@@ -90,7 +98,7 @@ class CustomerStatementView(APIView):
             .aggregate(total=Sum("amount_paid"))["total"] or 0
         )
 
-        outstanding_balance = total_udharo - total_paid
+        outstanding_balance = customer.opening_balance + total_udharo - total_paid
 
         # ---------------------------
         # 3. Normalize Transactions
@@ -120,7 +128,7 @@ class CustomerStatementView(APIView):
         # ---------------------------
         # 5. Running Balance
         # ---------------------------
-        balance = 0
+        balance = customer.opening_balance
         transactions = []
 
         for item in combined:
@@ -142,11 +150,7 @@ class CustomerStatementView(APIView):
         # 6. Final Response
         # ---------------------------
         response = {
-            "customer": {
-                "id": customer.id,
-                "name": customer.name,
-                "phone": getattr(customer, "phone", None),
-            },
+            "customer": CustomerSerializer(customer).data,
             "summary": {
                 "total_udharo": total_udharo,
                 "total_paid": total_paid,
