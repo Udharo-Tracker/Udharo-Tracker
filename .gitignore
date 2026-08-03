@@ -57,6 +57,16 @@ __pycache__
 .idea/
 
 # =====================
+# Claude Code (personal local settings)
+# =====================
+.claude/settings.local.json
+
+# =====================
 # Static build artifacts (if used)
 # =====================
 staticfiles/
+
+# =====================
+# Markdown files (notes/docs)
+# =====================
+*.md
