@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.core.cache import cache
 from django.db import transaction
 
@@ -9,13 +9,30 @@ from ...serializers.udharoEntry import UdharoEntrySerializer
 from ...tasks.services import calculate_credit_score
 
 # Create your views here.
-@extend_schema(tags=["Udharo"])
+@extend_schema(
+    tags=["Udharo"],
+    parameters=[
+        OpenApiParameter(
+            name="customer_id",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter udharo entries by customer UUID.",
+        ),
+    ],
+)
 class UdharoEntryViewSet(viewsets.ModelViewSet):
     serializer_class = UdharoEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
+        queryset = UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
+
+        customer_id = self.request.query_params.get("customer_id")
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+
+        return queryset
 
     def _clear_user_cache(self):
         cache.delete(f"ledger_summary_{self.request.user.id}")
