@@ -19,3 +19,8 @@ dependencies = [
     "gunicorn>=23.0.0",
     "django-cors-headers>=4.9.0",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+]
