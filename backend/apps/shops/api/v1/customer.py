@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.core.cache import cache
 from rest_framework import viewsets, permissions
 from drf_spectacular.utils import extend_schema
 
@@ -14,6 +15,19 @@ class CustomerViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Customer.objects.filter(shop__owner=self.request.user)
 
+    def _invalidate_ledger_cache(self):
+        cache.delete(f"ledger_summary_{self.request.user.id}")
+        cache.delete(f"dashboard_{self.request.user.id}")
+
     def perform_create(self, serializer):
         shop = self.request.user.shop
         serializer.save(shop=shop)
+        self._invalidate_ledger_cache()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        self._invalidate_ledger_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        self._invalidate_ledger_cache()
