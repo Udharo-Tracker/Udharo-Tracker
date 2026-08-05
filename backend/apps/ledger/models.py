@@ -1,10 +1,12 @@
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
 import uuid
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 from apps.shops.models import Customer, Shop
+from apps.shared.files_utils import file_upload_path, FileSizeValidator
 
 # Create your models here.
 
@@ -40,16 +42,50 @@ class UdharoEntryItem(models.Model):
 
 
 class Payment(models.Model):
+
+    class PaymentMode(models.TextChoices):
+        CASH = "cash", "Cash"
+        CARD = "card", "Card"
+        FONEPAY = "fonepay", "Fonepay"
+        NEPAL_PAY = "nepal_pay", "Nepal Pay"
+        BANK_TRANSFER = "bank_transfer", "Bank Transfer"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(
         Customer, on_delete=models.CASCADE, related_name="payments"
     )
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_mode = models.CharField(
+        max_length=20, choices=PaymentMode.choices, default=PaymentMode.CASH
+    )
+    reference = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Bank/wallet transaction ID, cheque number, etc.",
+    )
     note = models.TextField(blank=True)
+    # When the payment actually happened — editable, can be backdated.
+    # created_at (below) is when the row was entered into the system.
+    transaction_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.customer.name} - Rs.{self.amount_paid}"
+
+
+class PaymentPhoto(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payment = models.ForeignKey(
+        Payment, on_delete=models.CASCADE, related_name="photos"
+    )
+    image = models.ImageField(
+        upload_to=file_upload_path,
+        validators=[FileSizeValidator(5 * 1024 * 1024)],
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Photo for {self.payment_id}"
 
 
 class ReminderLog(models.Model):
@@ -164,3 +200,43 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.txn_number} - {self.customer.name} - Rs.{self.amount}"
+
+
+class Allocation(models.Model):
+    """Links a payment-type Transaction to the debt-type Transaction
+    (opening or udharo) it pays off. A debt's unpaid amount is its own
+    `amount` minus sum(allocations_received); a payment's coverage is
+    sum(allocations_made). This replaces pooled, customer-wide settlement
+    with per-entry settlement — each debt tracks its own paid/unpaid,
+    independent of every other debt."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payment_transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.CASCADE,
+        related_name="allocations_made",
+        limit_choices_to={"txn_type": Transaction.TxnType.PAYMENT},
+    )
+    debt_transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.CASCADE,
+        related_name="allocations_received",
+        limit_choices_to={
+            "txn_type__in": [Transaction.TxnType.OPENING, Transaction.TxnType.UDHARO]
+        },
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0), name="allocation_amount_positive"
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.payment_transaction.txn_number} -> "
+            f"{self.debt_transaction.txn_number}: Rs.{self.amount}"
+        )
