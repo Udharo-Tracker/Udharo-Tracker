@@ -1,14 +1,19 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Sum
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from django.core.cache import cache
-from django.utils import timezone
 
 from ...models import Payment, Transaction
 from ...serializers.payment import PaymentSerializer
-from ...tasks.services import calculate_credit_score, record_transaction
+from ...tasks.services import (
+    allocate_payment_fifo,
+    calculate_credit_score,
+    clear_ledger_cache,
+    get_outstanding_balance,
+    reallocate_payment,
+    record_transaction,
+    sync_udharo_settlement,
+)
 
 
 @extend_schema(
@@ -46,15 +51,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if amount <= 0:
             raise ValidationError("Payment amount must be positive.")
 
-        # Calculate real balance from source of truth (all-time entries vs
-        # all-time payments, so it stays in sync regardless of settlement state)
-        total_udharo = (
-            customer.udharo_entries.aggregate(total=Sum("items__amount"))["total"] or 0
-        )
-
-        total_paid = customer.payments.aggregate(total=Sum("amount_paid"))["total"] or 0
-
-        balance = total_udharo - total_paid
+        # Balance from the single source of truth (includes opening_balance).
+        balance = get_outstanding_balance(customer)
 
         if amount > balance:
             raise ValidationError(
@@ -65,45 +63,69 @@ class PaymentViewSet(viewsets.ModelViewSet):
             serializer.save()
             payment = serializer.instance
 
-            # Recalculate balance after payment (all-time, see comment above)
-            total_udharo = (
-                customer.udharo_entries.aggregate(total=Sum("items__amount"))["total"]
-                or 0
-            )
-
-            total_paid = (
-                customer.payments.aggregate(total=Sum("amount_paid"))["total"] or 0
-            )
-
-            balance = total_udharo - total_paid
-
-            # Auto settle if fully paid
-            if balance == 0:
-                customer.udharo_entries.filter(is_settled=False).update(
-                    settled_at=timezone.now(), is_settled=True
-                )
-
-            calculate_credit_score(customer)
-            record_transaction(
+            payment_txn = record_transaction(
                 customer=customer,
                 txn_type=Transaction.TxnType.PAYMENT,
                 amount=payment.amount_paid,
                 user=self.request.user,
                 remarks=payment.note,
-                transaction_date=payment.created_at,
+                status="paid",
+                transaction_date=payment.transaction_date,
                 payment=payment,
             )
 
-        self._clear_user_cache()
+            # Auto-allocate this payment against the customer's oldest unpaid
+            # debts first (FIFO), then resettle/unsettle entries based on
+            # their own allocations and keep Transaction.status in sync.
+            allocate_payment_fifo(payment_txn)
+            sync_udharo_settlement(customer)
 
-    def _clear_user_cache(self):
-        cache.delete(f"ledger_summary_{self.request.user.id}")
-        cache.delete(f"dashboard_{self.request.user.id}")
+            calculate_credit_score(customer)
+
+        clear_ledger_cache(self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
-        self._clear_user_cache()
+        payment = self.get_object()
+        customer = payment.customer
+        old_amount = payment.amount_paid
+        new_amount = serializer.validated_data.get("amount_paid", old_amount)
+
+        if new_amount <= 0:
+            raise ValidationError("Payment amount must be positive.")
+
+        # This payment's own amount is already counted in the pooled balance,
+        # so give it back before checking the new amount fits.
+        available = get_outstanding_balance(customer) + old_amount
+        if new_amount > available:
+            raise ValidationError(
+                f"Payment of Rs.{new_amount} exceeds available outstanding "
+                f"balance of Rs.{available}."
+            )
+
+        with transaction.atomic():
+            payment = serializer.save()
+
+            # Keep the audit-trail row's amount/remarks/date from going stale.
+            payment_txn = Transaction.objects.get(payment=payment)
+            payment_txn.amount = payment.amount_paid
+            payment_txn.remarks = payment.note
+            payment_txn.transaction_date = payment.transaction_date
+            payment_txn.save(update_fields=["amount", "remarks", "transaction_date"])
+
+            # Amount may have changed — redo this payment's allocations from
+            # scratch against the customer's currently-unpaid debts.
+            reallocate_payment(payment_txn)
+            sync_udharo_settlement(customer)
+            calculate_credit_score(customer)
+
+        clear_ledger_cache(self.request.user)
 
     def perform_destroy(self, instance):
-        instance.delete()
-        self._clear_user_cache()
+        customer = instance.customer
+
+        with transaction.atomic():
+            instance.delete()
+            sync_udharo_settlement(customer)
+            calculate_credit_score(customer)
+
+        clear_ledger_cache(self.request.user)
