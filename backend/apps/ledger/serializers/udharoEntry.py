@@ -12,20 +12,43 @@ class UdharoEntrySerializer(serializers.ModelSerializer):
     total_amount = serializers.ReadOnlyField()
     customer = CustomerSerializer(read_only=True)
     customer_id = serializers.PrimaryKeyRelatedField(
-        queryset=Customer.objects.all(), source='customer', write_only=True
+        queryset=Customer.objects.all(), source="customer", write_only=True
     )
 
     class Meta:
         model = UdharoEntry
-        fields = ['id', 'customer', 'customer_id', 'items', 'total_amount', 'note',
-                  'is_settled', 'created_at', 'settled_at']
-        read_only_fields = ['created_at', 'settled_at', 'is_settled', 'total_amount']
+        fields = [
+            "id",
+            "customer",
+            "customer_id",
+            "items",
+            "total_amount",
+            "note",
+            "is_settled",
+            "created_at",
+            "settled_at",
+        ]
+        read_only_fields = ["created_at", "settled_at", "is_settled", "total_amount"]
 
     def create(self, validated_data):
-        items_data = validated_data.pop('items')
+        items_data = validated_data.pop("items")
 
         with transaction.atomic():
             entry = UdharoEntry.objects.create(**validated_data)
             for item in items_data:
                 UdharoEntryItem.objects.create(entry=entry, **item)
         return entry
+
+    def update(self, instance, validated_data):
+        # Nested `items` isn't something DRF's default ModelSerializer.update()
+        # can handle (it would try to .set() the FK manager with raw dicts),
+        # so replace the item set explicitly when items are included.
+        items_data = validated_data.pop("items", None)
+
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if items_data is not None:
+                instance.items.all().delete()
+                for item in items_data:
+                    UdharoEntryItem.objects.create(entry=instance, **item)
+        return instance
