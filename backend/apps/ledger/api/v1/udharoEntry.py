@@ -4,9 +4,10 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.core.cache import cache
 from django.db import transaction
 
-from ...models import UdharoEntry
+from ...models import UdharoEntry, Transaction
 from ...serializers.udharoEntry import UdharoEntrySerializer
-from ...tasks.services import calculate_credit_score
+from ...tasks.services import calculate_credit_score, record_transaction
+
 
 # Create your views here.
 @extend_schema(
@@ -45,8 +46,18 @@ class UdharoEntryViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You don't own this customer.")
 
         with transaction.atomic():
-            serializer.save()
+            entry = serializer.save()
             calculate_credit_score(customer)
+            record_transaction(
+                customer=customer,
+                txn_type=Transaction.TxnType.UDHARO,
+                amount=entry.total_amount,
+                user=self.request.user,
+                remarks=entry.note,
+                transaction_date=entry.created_at,
+                udharo_entry=entry,
+                status="open",
+            )
 
         self._clear_user_cache()
 
@@ -57,4 +68,3 @@ class UdharoEntryViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.delete()
         self._clear_user_cache()
-        

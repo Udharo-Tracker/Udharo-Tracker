@@ -6,9 +6,10 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.core.cache import cache
 from django.utils import timezone
 
-from ...models import Payment
+from ...models import Payment, Transaction
 from ...serializers.payment import PaymentSerializer
-from ...tasks.services import calculate_credit_score
+from ...tasks.services import calculate_credit_score, record_transaction
+
 
 @extend_schema(
     tags=["Payments"],
@@ -45,16 +46,13 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if amount <= 0:
             raise ValidationError("Payment amount must be positive.")
 
-        # Calculate real balance from source of truth
-        total_udharo = customer.udharo_entries.filter(
-        is_settled=False
-        ).aggregate(
-            total=Sum('items__amount')
-        )['total'] or 0
+        # Calculate real balance from source of truth (all-time entries vs
+        # all-time payments, so it stays in sync regardless of settlement state)
+        total_udharo = (
+            customer.udharo_entries.aggregate(total=Sum("items__amount"))["total"] or 0
+        )
 
-        total_paid = customer.payments.aggregate(
-            total=Sum('amount_paid')
-        )['total'] or 0
+        total_paid = customer.payments.aggregate(total=Sum("amount_paid"))["total"] or 0
 
         balance = total_udharo - total_paid
 
@@ -65,26 +63,37 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             serializer.save()
+            payment = serializer.instance
 
-            # Recalculate balance after payment
-            total_udharo = customer.udharo_entries.filter(
-                is_settled=False
-            ).aggregate(total=Sum('items__amount'))['total'] or 0
-            
-            total_paid = customer.payments.aggregate(
-                total=Sum('amount_paid')
-            )['total'] or 0
-            
+            # Recalculate balance after payment (all-time, see comment above)
+            total_udharo = (
+                customer.udharo_entries.aggregate(total=Sum("items__amount"))["total"]
+                or 0
+            )
+
+            total_paid = (
+                customer.payments.aggregate(total=Sum("amount_paid"))["total"] or 0
+            )
+
             balance = total_udharo - total_paid
-            
+
             # Auto settle if fully paid
             if balance == 0:
-                customer.udharo_entries.filter(
-                    is_settled=False
-                ).update(settled_at=timezone.now(), is_settled=True)   
+                customer.udharo_entries.filter(is_settled=False).update(
+                    settled_at=timezone.now(), is_settled=True
+                )
 
-            calculate_credit_score(customer)         
-        
+            calculate_credit_score(customer)
+            record_transaction(
+                customer=customer,
+                txn_type=Transaction.TxnType.PAYMENT,
+                amount=payment.amount_paid,
+                user=self.request.user,
+                remarks=payment.note,
+                transaction_date=payment.created_at,
+                payment=payment,
+            )
+
         self._clear_user_cache()
 
     def _clear_user_cache(self):
