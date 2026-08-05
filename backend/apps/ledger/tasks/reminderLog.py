@@ -1,7 +1,21 @@
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Sum, Case, When, Value, CharField, Exists, OuterRef, Max, DecimalField, F, ExpressionWrapper, Q, Subquery
+from django.db.models import (
+    Sum,
+    Case,
+    When,
+    Value,
+    CharField,
+    Exists,
+    OuterRef,
+    Max,
+    DecimalField,
+    F,
+    ExpressionWrapper,
+    Q,
+    Subquery,
+)
 from django.db.models.functions import Coalesce
 
 
@@ -15,41 +29,44 @@ def send_daily_reminders():
     now = timezone.now()
     thirty_days_ago = now - timedelta(days=30)
 
+    # All-time sum (settled or not), to stay in sync with total_paid, which is
+    # also all-time. Filtering to is_settled=False here would make paid-off
+    # entries vanish from the balance while their payments remain, producing
+    # a false-negative outstanding_balance (see services.get_outstanding_balance).
+    udharo_sum = (
+        UdharoEntry.objects.filter(customer=OuterRef("pk"))
+        .values("customer")
+        .annotate(total=Sum("items__amount"))
+        .values("total")
+    )
 
-    udharo_sum = UdharoEntry.objects.filter(
-        customer=OuterRef('pk'),
-        is_settled=False
-        ).values('customer').annotate(
-            total=Sum('items__amount')
-        ).values('total')
+    payment_sum = (
+        Payment.objects.filter(customer=OuterRef("pk"))
+        .values("customer")
+        .annotate(total=Sum("amount_paid"))
+        .values("total")
+    )
 
-    payment_sum = Payment.objects.filter(
-            customer=OuterRef('pk')
-        ).values('customer').annotate(
-            total=Sum('amount_paid')
-        ).values('total')
-
-
-    queryset = Customer.objects.filter(
-            udharo_entries__is_settled = False,
-            udharo_entries__created_at__lte=thirty_days_ago 
-        ).annotate(
-        total_udharo=Coalesce(
-            Subquery(udharo_sum), 
-            Value(0), 
-            output_field=DecimalField()
+    queryset = (
+        Customer.objects.filter(
+            udharo_entries__is_settled=False,
+            udharo_entries__created_at__lte=thirty_days_ago,
+        )
+        .annotate(
+            total_udharo=Coalesce(
+                Subquery(udharo_sum), Value(0), output_field=DecimalField()
             ),
             total_paid=Coalesce(
-            Subquery(payment_sum), 
-            Value(0), 
-            output_field=DecimalField()
+                Subquery(payment_sum), Value(0), output_field=DecimalField()
             ),
             outstanding_balance=ExpressionWrapper(
-            F('opening_balance') + F('total_udharo') - F('total_paid'),
-            output_field=DecimalField()
+                F("opening_balance") + F("total_udharo") - F("total_paid"),
+                output_field=DecimalField(),
             ),
-        ).filter(outstanding_balance__gt=0).distinct()
-
+        )
+        .filter(outstanding_balance__gt=0)
+        .distinct()
+    )
 
     for customer in queryset:
         ReminderLog.objects.create(
