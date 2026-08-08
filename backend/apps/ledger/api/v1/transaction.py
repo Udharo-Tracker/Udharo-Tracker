@@ -16,7 +16,7 @@ _DETAIL_PREFETCH_RELATED = (
     "udharo_entry__items",
     "payment__photos",
     "allocations_made__debt_transaction",
-    "allocations_received__payment_transaction",
+    "allocations_received__payment_transaction__payment__photos",
 )
 
 
