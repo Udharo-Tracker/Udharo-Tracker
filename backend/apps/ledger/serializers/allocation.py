@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from ..models import Allocation, Transaction
+from ..models import Transaction
 
 
 class TransactionRefSerializer(serializers.ModelSerializer):
@@ -11,13 +11,3 @@ class TransactionRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ["id", "txn_number", "transaction_date"]
-
-
-class AllocationOutSerializer(serializers.ModelSerializer):
-    """What a payment-type transaction cleared."""
-
-    debt_transaction = TransactionRefSerializer(read_only=True)
-
-    class Meta:
-        model = Allocation
-        fields = ["debt_transaction", "amount"]
