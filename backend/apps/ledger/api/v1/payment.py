@@ -1,9 +1,11 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 
 from ...models import Payment, Transaction
+from ...filters import PaymentFilter
 from ...serializers.payment import PaymentSerializer
 from ...tasks.services import (
     allocate_payment_fifo,
@@ -16,30 +18,15 @@ from ...tasks.services import (
 )
 
 
-@extend_schema(
-    tags=["Payments"],
-    parameters=[
-        OpenApiParameter(
-            name="customer_id",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            required=False,
-            description="Filter payments by customer UUID.",
-        ),
-    ],
-)
+@extend_schema(tags=["Payments"])
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = PaymentFilter
 
     def get_queryset(self):
-        queryset = Payment.objects.filter(customer__shop__owner=self.request.user)
-
-        customer_id = self.request.query_params.get("customer_id")
-        if customer_id:
-            queryset = queryset.filter(customer_id=customer_id)
-
-        return queryset
+        return Payment.objects.filter(customer__shop__owner=self.request.user)
 
     def perform_create(self, serializer):
         customer = serializer.validated_data["customer"]

@@ -2,9 +2,11 @@ from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 
 from ...models import Allocation, Transaction
+from ...filters import TransactionFilter
 from ...serializers.transaction import TransactionListSerializer, TransactionSerializer
 from ...tasks.services import build_balance_after_map, build_running_totals_map
 
@@ -34,43 +36,17 @@ def _with_allocated_amount(queryset):
     )
 
 
-@extend_schema(
-    tags=["Transactions"],
-    parameters=[
-        OpenApiParameter(
-            name="customer_id",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            required=False,
-            description="Filter transactions by customer UUID.",
-        ),
-        OpenApiParameter(
-            name="type",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            required=False,
-            description="Filter transactions by type: opening, udharo, or payment.",
-        ),
-    ],
-)
+@extend_schema(tags=["Transactions"])
 class TransactionListView(generics.ListAPIView):
     serializer_class = TransactionListSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = TransactionFilter
 
     def get_queryset(self):
-        queryset = Transaction.objects.filter(
+        return Transaction.objects.filter(
             customer__shop__owner=self.request.user
         ).select_related("customer")
-
-        customer_id = self.request.query_params.get("customer_id")
-        if customer_id:
-            queryset = queryset.filter(customer_id=customer_id)
-
-        txn_type = self.request.query_params.get("type")
-        if txn_type:
-            queryset = queryset.filter(txn_type=txn_type)
-
-        return queryset
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

@@ -1,9 +1,11 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 from django.db import transaction
 
 from ...models import UdharoEntry, Transaction
+from ...filters import UdharoEntryFilter
 from ...serializers.udharoEntry import UdharoEntrySerializer
 from ...tasks.services import (
     calculate_credit_score,
@@ -15,30 +17,15 @@ from ...tasks.services import (
 
 
 # Create your views here.
-@extend_schema(
-    tags=["Udharo"],
-    parameters=[
-        OpenApiParameter(
-            name="customer_id",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            required=False,
-            description="Filter udharo entries by customer UUID.",
-        ),
-    ],
-)
+@extend_schema(tags=["Udharo"])
 class UdharoEntryViewSet(viewsets.ModelViewSet):
     serializer_class = UdharoEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UdharoEntryFilter
 
     def get_queryset(self):
-        queryset = UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
-
-        customer_id = self.request.query_params.get("customer_id")
-        if customer_id:
-            queryset = queryset.filter(customer_id=customer_id)
-
-        return queryset
+        return UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
 
     def perform_create(self, serializer):
         customer = serializer.validated_data["customer"]
