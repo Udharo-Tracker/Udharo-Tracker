@@ -3,7 +3,7 @@ from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from ...models import Allocation, Transaction
 from ...filters import TransactionFilter
@@ -36,7 +36,57 @@ def _with_allocated_amount(queryset):
     )
 
 
-@extend_schema(tags=["Transactions"])
+# NOTE: drf-spectacular can't auto-derive these from TransactionFilter here,
+# because get_queryset() filters by request.user, which is AnonymousUser
+# during schema generation (pre-existing across every user-scoped viewset in
+# this codebase) — so the filter params are documented explicitly instead.
+@extend_schema(
+    tags=["Transactions"],
+    parameters=[
+        OpenApiParameter(
+            name="customer_id",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter transactions by customer UUID.",
+        ),
+        OpenApiParameter(
+            name="type",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter transactions by type: opening, udharo, or payment.",
+        ),
+        OpenApiParameter(
+            name="status",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter by status: open, closed, or paid.",
+        ),
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search transaction number/remarks (case-insensitive).",
+        ),
+        OpenApiParameter(
+            name="date_after",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only transactions dated on/after this date (YYYY-MM-DD).",
+        ),
+        OpenApiParameter(
+            name="date_before",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only transactions dated on/before this date (YYYY-MM-DD).",
+        ),
+    ],
+)
 class TransactionListView(generics.ListAPIView):
     serializer_class = TransactionListSerializer
     permission_classes = [permissions.IsAuthenticated]

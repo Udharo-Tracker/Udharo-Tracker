@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from ...models import Payment, Transaction
 from ...filters import PaymentFilter
@@ -18,7 +18,50 @@ from ...tasks.services import (
 )
 
 
-@extend_schema(tags=["Payments"])
+# NOTE: drf-spectacular can't auto-derive these from PaymentFilter here,
+# because get_queryset() filters by request.user, which is AnonymousUser
+# during schema generation (pre-existing across every user-scoped viewset in
+# this codebase) — so the filter params are documented explicitly instead.
+@extend_schema(
+    tags=["Payments"],
+    parameters=[
+        OpenApiParameter(
+            name="customer_id",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter payments by customer UUID.",
+        ),
+        OpenApiParameter(
+            name="payment_mode",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter by payment mode: cash, card, fonepay, nepal_pay, or bank_transfer.",
+        ),
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search payment reference/note (case-insensitive).",
+        ),
+        OpenApiParameter(
+            name="date_after",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only payments dated on/after this date (YYYY-MM-DD).",
+        ),
+        OpenApiParameter(
+            name="date_before",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only payments dated on/before this date (YYYY-MM-DD).",
+        ),
+    ],
+)
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
