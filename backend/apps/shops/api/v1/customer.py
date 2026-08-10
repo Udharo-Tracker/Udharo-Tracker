@@ -2,9 +2,11 @@ from django.shortcuts import render
 from django.db import transaction
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import ValidationError
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 
 from ...models import Customer
+from ...filters import CustomerFilter
 from apps.shops.serializers.customer import CustomerSerializer, CustomerDetailSerializer
 from apps.ledger.models import Transaction
 from apps.ledger.tasks.services import (
@@ -21,6 +23,8 @@ from apps.ledger.tasks.services import (
 @extend_schema(tags=["Customers"])
 class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CustomerFilter
 
     def get_serializer_class(self):
         # List rows are plain customer fields only — no ledger_summary — so
