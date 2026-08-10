@@ -2,6 +2,8 @@ import uuid
 from django.db import models
 from django.conf import settings
 
+from apps.shared.files_utils import file_upload_path, FileSizeValidator
+
 
 # Create your models here.
 class Shop(models.Model):
@@ -10,6 +12,16 @@ class Shop(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shop"
     )
     name = models.CharField(max_length=255)
+    # Registered/legal business name, if different from the shop's display name.
+    legal_name = models.CharField(max_length=255, blank=True)
+    # Nepal PAN/VAT number.
+    tax_number = models.CharField(max_length=20, blank=True)
+    logo = models.ImageField(
+        upload_to=file_upload_path,
+        validators=[FileSizeValidator(1 * 1024 * 1024)],
+        null=True,
+        blank=True,
+    )
     phone = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

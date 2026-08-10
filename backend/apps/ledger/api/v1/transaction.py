@@ -2,9 +2,11 @@ from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from ...models import Allocation, Transaction
+from ...filters import TransactionFilter
 from ...serializers.transaction import TransactionListSerializer, TransactionSerializer
 from ...tasks.services import build_balance_after_map, build_running_totals_map
 
@@ -16,7 +18,7 @@ _DETAIL_PREFETCH_RELATED = (
     "udharo_entry__items",
     "payment__photos",
     "allocations_made__debt_transaction",
-    "allocations_received__payment_transaction",
+    "allocations_received__payment_transaction__payment__photos",
 )
 
 
@@ -34,6 +36,10 @@ def _with_allocated_amount(queryset):
     )
 
 
+# NOTE: drf-spectacular can't auto-derive these from TransactionFilter here,
+# because get_queryset() filters by request.user, which is AnonymousUser
+# during schema generation (pre-existing across every user-scoped viewset in
+# this codebase) — so the filter params are documented explicitly instead.
 @extend_schema(
     tags=["Transactions"],
     parameters=[
@@ -51,26 +57,46 @@ def _with_allocated_amount(queryset):
             required=False,
             description="Filter transactions by type: opening, udharo, or payment.",
         ),
+        OpenApiParameter(
+            name="status",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter by status: open, closed, or paid.",
+        ),
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search transaction number/remarks (case-insensitive).",
+        ),
+        OpenApiParameter(
+            name="date_after",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only transactions dated on/after this date (YYYY-MM-DD).",
+        ),
+        OpenApiParameter(
+            name="date_before",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only transactions dated on/before this date (YYYY-MM-DD).",
+        ),
     ],
 )
 class TransactionListView(generics.ListAPIView):
     serializer_class = TransactionListSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = TransactionFilter
 
     def get_queryset(self):
-        queryset = Transaction.objects.filter(
+        return Transaction.objects.filter(
             customer__shop__owner=self.request.user
         ).select_related("customer")
-
-        customer_id = self.request.query_params.get("customer_id")
-        if customer_id:
-            queryset = queryset.filter(customer_id=customer_id)
-
-        txn_type = self.request.query_params.get("type")
-        if txn_type:
-            queryset = queryset.filter(txn_type=txn_type)
-
-        return queryset
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

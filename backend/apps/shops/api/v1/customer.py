@@ -2,9 +2,11 @@ from django.shortcuts import render
 from django.db import transaction
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema
+from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from ...models import Customer
+from ...filters import CustomerFilter
 from apps.shops.serializers.customer import CustomerSerializer, CustomerDetailSerializer
 from apps.ledger.models import Transaction
 from apps.ledger.tasks.services import (
@@ -18,9 +20,54 @@ from apps.ledger.tasks.services import (
 
 
 # Create your views here.
-@extend_schema(tags=["Customers"])
+# NOTE: drf-spectacular can't auto-derive these from CustomerFilter here,
+# because get_queryset() filters by request.user, which is AnonymousUser
+# during schema generation (pre-existing across every user-scoped viewset in
+# this codebase) — so the filter params are documented explicitly instead.
+@extend_schema(
+    tags=["Customers"],
+    parameters=[
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search customers by name, phone, or email (case-insensitive).",
+        ),
+        OpenApiParameter(
+            name="min_credit_limit",
+            type=float,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only customers with credit_limit >= this value.",
+        ),
+        OpenApiParameter(
+            name="max_credit_limit",
+            type=float,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only customers with credit_limit <= this value.",
+        ),
+        OpenApiParameter(
+            name="created_after",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only customers created on/after this date (YYYY-MM-DD).",
+        ),
+        OpenApiParameter(
+            name="created_before",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only customers created on/before this date (YYYY-MM-DD).",
+        ),
+    ],
+)
 class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CustomerFilter
 
     def get_serializer_class(self):
         # List rows are plain customer fields only — no ledger_summary — so

@@ -3,11 +3,12 @@ from rest_framework.response import Response
 from rest_framework import permissions, status
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
-from drf_spectacular.utils import extend_schema, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
 from apps.shops.models import Customer
 from ...models import ReminderLog
+from ...filters import ReminderLogFilter
 from ...serializers.ReminderLog import ReminderLogSerializer
 from ...tasks.services import get_outstanding_balance
 from ...services.sms import send_sms
@@ -16,14 +17,56 @@ from ...services.sms import send_sms
 class ReminderLogView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(tags=["Reminder Log"], responses=ReminderLogSerializer(many=True))
+    @extend_schema(
+        tags=["Reminder Log"],
+        responses=ReminderLogSerializer(many=True),
+        parameters=[
+            OpenApiParameter(
+                name="channel",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by channel: note, sms, or auto.",
+            ),
+            OpenApiParameter(
+                name="delivery_status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by delivery status, e.g. sent or failed.",
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Search reminder notes (case-insensitive).",
+            ),
+            OpenApiParameter(
+                name="date_after",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Only reminders sent on/after this date (YYYY-MM-DD).",
+            ),
+            OpenApiParameter(
+                name="date_before",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Only reminders sent on/before this date (YYYY-MM-DD).",
+            ),
+        ],
+    )
     def get(self, request, customer_id):
         customer = get_object_or_404(Customer, id=customer_id)
 
         if customer.shop.owner != request.user:
             raise PermissionDenied()
 
-        logs = ReminderLog.objects.filter(customer=customer).order_by('-sent_at')
+        logs = ReminderLog.objects.filter(customer=customer).order_by("-sent_at")
+        logs = ReminderLogFilter(request.query_params, queryset=logs).qs
+
         serializer = ReminderLogSerializer(logs, many=True)
         return Response(serializer.data)
 
@@ -50,15 +93,13 @@ class ReminderLogView(APIView):
         if outstanding_balance <= 0:
             return Response(
                 {"detail": "Customer has no outstanding balance."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        note = request.data.get('note', '')
+        note = request.data.get("note", "")
 
         reminder = ReminderLog.objects.create(
-            customer=customer,
-            outstanding_balance=outstanding_balance,
-            note=note
+            customer=customer, outstanding_balance=outstanding_balance, note=note
         )
 
         serializer = ReminderLogSerializer(reminder)
@@ -83,7 +124,7 @@ class ReminderSMSView(APIView):
         if not customer.phone:
             return Response(
                 {"detail": "Customer has no phone number on file."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         outstanding_balance = get_outstanding_balance(customer)
@@ -91,7 +132,7 @@ class ReminderSMSView(APIView):
         if outstanding_balance <= 0:
             return Response(
                 {"detail": "Customer has no outstanding balance."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         message = (
@@ -110,5 +151,9 @@ class ReminderSMSView(APIView):
         )
 
         serializer = ReminderLogSerializer(reminder)
-        response_status = status.HTTP_201_CREATED if result["success"] else status.HTTP_502_BAD_GATEWAY
+        response_status = (
+            status.HTTP_201_CREATED
+            if result["success"]
+            else status.HTTP_502_BAD_GATEWAY
+        )
         return Response(serializer.data, status=response_status)

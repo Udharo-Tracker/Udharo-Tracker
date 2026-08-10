@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from ..models import Transaction
 from ..tasks.services import get_allocated_amount
-from .allocation import AllocationOutSerializer, TransactionRefSerializer
+from .allocation import TransactionRefSerializer
 from .payment import PaymentPhotoSerializer
 from apps.shops.serializers.customer import CustomerSerializer
 
@@ -13,7 +13,6 @@ class TransactionSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     recorded_by = serializers.SerializerMethodField()
     udharo_entry = serializers.SerializerMethodField()
-    payment = serializers.SerializerMethodField()
     parties = serializers.SerializerMethodField()
     allocations = serializers.SerializerMethodField()
     balance_after = serializers.SerializerMethodField()
@@ -33,7 +32,6 @@ class TransactionSerializer(serializers.ModelSerializer):
             "customer",
             "recorded_by",
             "udharo_entry",
-            "payment",
             "parties",
             "allocations",
             "balance_after",
@@ -65,16 +63,23 @@ class TransactionSerializer(serializers.ModelSerializer):
             ],
         }
 
-    def get_payment(self, obj):
-        if obj.txn_type != Transaction.TxnType.PAYMENT or not obj.payment_id:
-            return None
-        payment = obj.payment
+    def _payment_entry(self, payment, *, amount, allocated_from):
+        # Shared shape for a single `payments[]` row, whichever side it's
+        # rendered from — the payment's own info (mode/reference/photos)
+        # plus how much of it applies here and where it came from.
         return {
-            "payment_mode": payment.payment_mode,
-            "reference": payment.reference,
-            "photos": PaymentPhotoSerializer(
-                payment.photos.all(), many=True, context=self.context
-            ).data,
+            "payment_mode": payment.payment_mode if payment else None,
+            "reference": payment.reference if payment else "",
+            "photos": (
+                PaymentPhotoSerializer(
+                    payment.photos.all(), many=True, context=self.context
+                ).data
+                if payment
+                else []
+            ),
+            "amount": amount,
+            "write_off_amount": 0,
+            "allocated_from": allocated_from,
         }
 
     def get_parties(self, obj):
@@ -83,37 +88,35 @@ class TransactionSerializer(serializers.ModelSerializer):
         # without changing the response shape.
         if obj.txn_type == Transaction.TxnType.PAYMENT:
             paid_amount, unpaid_amount = obj.amount, 0
-            payments = []
-            allocated_from_transactions = []
+            # This payment's own info, in the same shape a debt
+            # transaction's `payments` entries use — allocated_from is null
+            # here since this payment wasn't itself paid off by another one.
+            payments = [
+                self._payment_entry(
+                    obj.payment if obj.payment_id else None,
+                    amount=obj.amount,
+                    allocated_from=None,
+                )
+            ]
         else:
             paid_amount = getattr(obj, "allocated_amount", None)
             if paid_amount is None:
                 paid_amount = get_allocated_amount(obj)
             unpaid_amount = obj.amount - paid_amount
 
-            # Both views onto the same allocations_received, kept side by
-            # side: `payments` is the per-payment breakdown (with a nested
-            # ref back to the source transaction); `allocated_from_transactions`
-            # is the flatter "which transactions paid this off" list.
-            allocations = obj.allocations_received.all()
             payments = [
-                {
-                    "amount": alloc.amount,
-                    "write_off_amount": 0,
-                    "allocated_from": TransactionRefSerializer(
+                self._payment_entry(
+                    (
+                        alloc.payment_transaction.payment
+                        if alloc.payment_transaction.payment_id
+                        else None
+                    ),
+                    amount=alloc.amount,
+                    allocated_from=TransactionRefSerializer(
                         alloc.payment_transaction, context=self.context
                     ).data,
-                }
-                for alloc in allocations
-            ]
-            allocated_from_transactions = [
-                {
-                    "id": alloc.payment_transaction.id,
-                    "txn_number": alloc.payment_transaction.txn_number,
-                    "transaction_date": alloc.payment_transaction.transaction_date,
-                    "amount": alloc.amount,
-                }
-                for alloc in allocations
+                )
+                for alloc in obj.allocations_received.all()
             ]
 
         return [
@@ -126,16 +129,28 @@ class TransactionSerializer(serializers.ModelSerializer):
                 "unpaid_amount": unpaid_amount,
                 "status": obj.status,
                 "payments": payments,
-                "allocated_from_transactions": allocated_from_transactions,
             }
         ]
 
     def get_allocations(self, obj):
         if obj.txn_type != Transaction.TxnType.PAYMENT:
             return None
-        return AllocationOutSerializer(
-            obj.allocations_made.all(), many=True, context=self.context
-        ).data
+        return [
+            {
+                "id": alloc.id,
+                "total": alloc.debt_transaction.amount,
+                "amount": alloc.amount,
+                "write_off_amount": 0,
+                "transaction_date": alloc.debt_transaction.transaction_date,
+                # No due-date concept in this app (unlike the reference's
+                # credit-terms-per-bill model) — kept as an explicit null
+                # placeholder so the field shape still matches.
+                "due_date": None,
+                "transaction_id": alloc.debt_transaction.id,
+                "txn_number": alloc.debt_transaction.txn_number,
+            }
+            for alloc in obj.allocations_made.all()
+        ]
 
     def get_balance_after(self, obj):
         return self.context.get("balance_after_map", {}).get(obj.id)

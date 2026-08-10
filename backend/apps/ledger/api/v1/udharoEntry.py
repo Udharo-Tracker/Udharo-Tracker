@@ -1,9 +1,11 @@
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.db import transaction
 
 from ...models import UdharoEntry, Transaction
+from ...filters import UdharoEntryFilter
 from ...serializers.udharoEntry import UdharoEntrySerializer
 from ...tasks.services import (
     calculate_credit_score,
@@ -15,6 +17,10 @@ from ...tasks.services import (
 
 
 # Create your views here.
+# NOTE: drf-spectacular can't auto-derive these from UdharoEntryFilter here,
+# because get_queryset() filters by request.user, which is AnonymousUser
+# during schema generation (pre-existing across every user-scoped viewset in
+# this codebase) — so the filter params are documented explicitly instead.
 @extend_schema(
     tags=["Udharo"],
     parameters=[
@@ -25,20 +31,44 @@ from ...tasks.services import (
             required=False,
             description="Filter udharo entries by customer UUID.",
         ),
+        OpenApiParameter(
+            name="is_settled",
+            type=bool,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filter by settlement state.",
+        ),
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Search entry notes (case-insensitive).",
+        ),
+        OpenApiParameter(
+            name="created_after",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only entries created on/after this date (YYYY-MM-DD).",
+        ),
+        OpenApiParameter(
+            name="created_before",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Only entries created on/before this date (YYYY-MM-DD).",
+        ),
     ],
 )
 class UdharoEntryViewSet(viewsets.ModelViewSet):
     serializer_class = UdharoEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UdharoEntryFilter
 
     def get_queryset(self):
-        queryset = UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
-
-        customer_id = self.request.query_params.get("customer_id")
-        if customer_id:
-            queryset = queryset.filter(customer_id=customer_id)
-
-        return queryset
+        return UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
 
     def perform_create(self, serializer):
         customer = serializer.validated_data["customer"]

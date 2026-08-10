@@ -33,67 +33,72 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",") if os.environ.get("ALLOWED_HOSTS") else []
+ALLOWED_HOSTS = (
+    os.environ.get("ALLOWED_HOSTS", "").split(",")
+    if os.environ.get("ALLOWED_HOSTS")
+    else []
+)
 
 AUTH_USER_MODEL = "account.User"
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "drf_spectacular",
-    'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
-    'corsheaders',
-    'django_celery_beat',
-    'apps.account',
-    'apps.shops',
-    'apps.ledger',
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
+    "corsheaders",
+    "django_celery_beat",
+    "apps.account",
+    "apps.shops",
+    "apps.ledger",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", "udharotracker"),
         "USER": os.environ.get("DB_USER"),
         "PASSWORD": os.environ.get("DB_PASSWORD"),
@@ -108,16 +113,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -125,9 +130,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -137,31 +142,30 @@ USE_TZ = True
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # DRF Settings
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '20/min',
-        'user': '200/min',
-        'forgot_password': '5/hour',
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/min",
+        "user": "200/min",
+        "forgot_password": "5/hour",
     },
 }
 
@@ -170,7 +174,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Udharo Tracker API",
     "DESCRIPTION": "This is an API for Udharo Tracker (Debt Management Apps)",
     "VERSION": "1.0.0",
-     'SERVE_INCLUDE_SCHEMA': False,
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 CACHES = {
@@ -179,24 +183,24 @@ CACHES = {
         "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+        },
     }
 }
 
 
-CELERY_BROKER_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
-CELERY_TIMEZONE = 'Asia/Kathmandu'
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BROKER_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CELERY_TIMEZONE = "Asia/Kathmandu"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 CELERY_BEAT_SCHEDULE = {
-    'send-daily-reminders': {
-        'task': 'apps.ledger.tasks.reminderLog.send_daily_reminders',
-        'schedule': crontab(hour=9, minute=0),  # 9:00 AM Asia/Kathmandu daily
+    "send-daily-reminders": {
+        "task": "apps.ledger.tasks.reminderLog.send_daily_reminders",
+        "schedule": crontab(hour=9, minute=0),  # 9:00 AM Asia/Kathmandu daily
     },
-    'recalculate-credit-scores-daily': {
-        'task': 'apps.ledger.tasks.creditScore.recalculate_all_credit_scores',
-        'schedule': crontab(hour=0, minute=0),  # runs daily at midnight
+    "recalculate-credit-scores-daily": {
+        "task": "apps.ledger.tasks.creditScore.recalculate_all_credit_scores",
+        "schedule": crontab(hour=0, minute=0),  # runs daily at midnight
     },
 }
 
@@ -204,18 +208,24 @@ CELERY_BEAT_SCHEDULE = {
 # Defaults to the free console backend (logs the message, sends nothing) so no paid
 # gateway account is needed for local dev/testing. Swap in a real backend via env var
 # once a provider is chosen.
-SMS_BACKEND = config("SMS_BACKEND", default="apps.ledger.services.sms.ConsoleSMSBackend")
+SMS_BACKEND = config(
+    "SMS_BACKEND", default="apps.ledger.services.sms.ConsoleSMSBackend"
+)
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if os.environ.get("CORS_ALLOWED_ORIGINS") else []
+CORS_ALLOWED_ORIGINS = (
+    os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if os.environ.get("CORS_ALLOWED_ORIGINS")
+    else []
+)
 CORS_ALLOW_CREDENTIALS = True
 
 if not DEBUG:
@@ -226,31 +236,31 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_BROWSER_XSS_FILTER = True
-    X_FRAME_OPTIONS = 'DENY'
+    X_FRAME_OPTIONS = "DENY"
 
 # Without this, INFO-level logger.info() calls in apps/* (e.g. ConsoleSMSBackend)
 # are silently dropped: Django only auto-configures its own 'django.*' loggers,
 # and the root logger's default threshold is WARNING with no handler attached.
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '{levelname} {name}: {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {
+            "format": "{levelname} {name}: {message}",
+            "style": "{",
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
         },
     },
-    'loggers': {
-        'apps': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
+    "loggers": {
+        "apps": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
