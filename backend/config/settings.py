@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.account",
     "apps.shops",
     "apps.ledger",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [

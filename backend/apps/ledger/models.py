@@ -21,6 +21,9 @@ class UdharoEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     settled_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        ordering = ["-created_at"]
+
     @property
     def total_amount(self):
         return self.items.aggregate(total=Sum("amount"))["total"] or 0
@@ -68,6 +71,9 @@ class Payment(models.Model):
     # created_at (below) is when the row was entered into the system.
     transaction_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.customer.name} - Rs.{self.amount_paid}"
