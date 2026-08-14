@@ -400,6 +400,7 @@ def get_customers_with_balance(user):
                 "id": item.id,
                 "name": item.name,
                 "phone": item.phone,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
                 "total_udharo": item.total_udharo,
                 "total_paid": item.total_paid,
                 "outstanding_balance": item.outstanding_balance,
