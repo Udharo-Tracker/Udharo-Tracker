@@ -7,6 +7,7 @@ from drf_spectacular.types import OpenApiTypes
 
 from ...tasks.services import get_customers_with_balance
 
+
 @extend_schema(
     tags=["Ledger Summary"],
     responses=OpenApiResponse(
@@ -22,6 +23,7 @@ from ...tasks.services import get_customers_with_balance
                             "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                             "name": "Ram Sharma",
                             "phone": "+9779812345678",
+                            "created_at": "2026-07-01T09:00:00+05:45",
                             "total_udharo": 5000.0,
                             "total_paid": 2000.0,
                             "outstanding_balance": 3000.0,
@@ -42,7 +44,7 @@ class LedgerSummaryView(APIView):
     def get(self, request, format=None):
 
         cache_key = f"ledger_summary_{request.user.id}"
-    
+
         # 1. Check cache first
         cached = cache.get(cache_key)
         if cached:
@@ -50,13 +52,19 @@ class LedgerSummaryView(APIView):
 
         results = get_customers_with_balance(request.user)
 
+        # Ledger summary lists customers newest-first by created_at,
+        # unlike the dashboard which ranks them by outstanding balance.
+        customers_summary = sorted(
+            results["customers"],
+            key=lambda customer: customer["created_at"] or "",
+            reverse=True,
+        )
+
         # 4. Cache and return
         content = {
             "total_outstanding": results["total_outstanding"],
-            "customers_summary": results["customers"]
+            "customers_summary": customers_summary,
         }
 
         cache.set(cache_key, content, timeout=300)
         return Response(content)
-
-
