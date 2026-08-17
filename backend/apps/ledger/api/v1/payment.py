@@ -1,5 +1,6 @@
-from rest_framework import viewsets, permissions
+from rest_framework import status, viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.response import Response
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -15,6 +16,7 @@ from ...tasks.services import (
     reallocate_payment,
     record_transaction,
     sync_udharo_settlement,
+    void_payment,
 )
 
 
@@ -150,12 +152,27 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         clear_ledger_cache(self.request.user)
 
-    def perform_destroy(self, instance):
-        customer = instance.customer
+    @extend_schema(
+        tags=["Payments"],
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {"reason": {"type": "string"}},
+            }
+        },
+        description=(
+            "Voids the payment instead of deleting it: it stays visible in the "
+            "customer's statement (marked voided), its allocations are reversed "
+            "(whatever debts it paid off reopen), and it no longer counts toward "
+            'balance/credit score. Optional JSON body: {"reason": "..."}.'
+        ),
+    )
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        reason = request.data.get("reason", "")
 
         with transaction.atomic():
-            instance.delete()
-            sync_udharo_settlement(customer)
-            calculate_credit_score(customer)
+            void_payment(instance, reason=reason)
 
-        clear_ledger_cache(self.request.user)
+        clear_ledger_cache(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)

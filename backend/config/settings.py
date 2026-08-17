@@ -162,12 +162,18 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        # Views with no throttle_scope attribute (nearly all of them) are
+        # untouched by this — ScopedRateThrottle only activates where a view
+        # opts in, e.g. throttle_scope = "forgot_password" below.
+        "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "20/min",
         "user": "200/min",
         "forgot_password": "5/hour",
     },
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
 
 
@@ -212,6 +218,26 @@ CELERY_BEAT_SCHEDULE = {
 SMS_BACKEND = config(
     "SMS_BACKEND", default="apps.ledger.services.sms.ConsoleSMSBackend"
 )
+
+# EMAIL — used for account verification and password-reset links.
+# Defaults to Django's console backend (prints the email to stdout instead of
+# sending it), same free-for-dev approach as SMS_BACKEND above. Point
+# EMAIL_BACKEND at "django.core.mail.backends.smtp.EmailBackend" and fill in
+# the EMAIL_HOST_* values once a real provider (SES, SendGrid, etc.) is chosen.
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@udharotracker.com")
+
+# Base URL of the frontend app — verification/reset emails link to
+# f"{FRONTEND_URL}/verify-email?..." etc. This is an API-only backend with no
+# server-rendered pages, so the link always points at the frontend.
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 
 
 SIMPLE_JWT = {

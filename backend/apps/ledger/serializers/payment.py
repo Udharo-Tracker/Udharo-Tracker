@@ -43,8 +43,11 @@ class PaymentSerializer(serializers.ModelSerializer):
             "created_at",
             "photos",
             "photo_uploads",
+            "is_voided",
+            "voided_at",
+            "void_reason",
         ]
-        read_only_fields = ["created_at"]
+        read_only_fields = ["created_at", "is_voided", "voided_at", "void_reason"]
 
     def validate(self, attrs):
         photo_uploads = attrs.get("photo_uploads", [])

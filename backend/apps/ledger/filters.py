@@ -7,6 +7,7 @@ from .models import CreditScore, Payment, ReminderLog, Transaction, UdharoEntry
 class UdharoEntryFilter(django_filters.FilterSet):
     customer_id = django_filters.UUIDFilter(field_name="customer_id")
     is_settled = django_filters.BooleanFilter(field_name="is_settled")
+    is_voided = django_filters.BooleanFilter(field_name="is_voided")
     search = django_filters.CharFilter(field_name="note", lookup_expr="icontains")
     created_after = django_filters.DateFilter(
         field_name="created_at", lookup_expr="date__gte"
@@ -23,6 +24,7 @@ class UdharoEntryFilter(django_filters.FilterSet):
 class PaymentFilter(django_filters.FilterSet):
     customer_id = django_filters.UUIDFilter(field_name="customer_id")
     payment_mode = django_filters.ChoiceFilter(choices=Payment.PaymentMode.choices)
+    is_voided = django_filters.BooleanFilter(field_name="is_voided")
     search = django_filters.CharFilter(method="filter_search", label="Search")
     date_after = django_filters.DateFilter(
         field_name="transaction_date", lookup_expr="date__gte"

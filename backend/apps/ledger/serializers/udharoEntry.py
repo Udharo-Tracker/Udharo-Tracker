@@ -27,8 +27,19 @@ class UdharoEntrySerializer(serializers.ModelSerializer):
             "is_settled",
             "created_at",
             "settled_at",
+            "is_voided",
+            "voided_at",
+            "void_reason",
         ]
-        read_only_fields = ["created_at", "settled_at", "is_settled", "total_amount"]
+        read_only_fields = [
+            "created_at",
+            "settled_at",
+            "is_settled",
+            "total_amount",
+            "is_voided",
+            "voided_at",
+            "void_reason",
+        ]
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")

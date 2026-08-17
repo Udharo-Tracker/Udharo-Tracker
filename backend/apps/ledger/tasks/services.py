@@ -18,6 +18,8 @@ from django.db.models import (
     Subquery,
 )
 
+from rest_framework.exceptions import ValidationError
+
 from apps.shops.models import Customer
 from apps.ledger.models import UdharoEntry, Payment
 
@@ -32,12 +34,22 @@ def get_balance_breakdown(customer):
     # Sum ALL entries (settled or not) so this stays in sync with total_paid,
     # which is also all-time. Filtering to is_settled=False here would make
     # paid-off entries vanish from the balance while their payments remain,
-    # producing a false negative balance.
+    # producing a false negative balance. Voided entries/payments are
+    # excluded throughout — they're kept visible in the statement but never
+    # count toward money owed.
     total_udharo = (
-        customer.udharo_entries.aggregate(total=Sum("items__amount"))["total"] or 0
+        customer.udharo_entries.filter(is_voided=False).aggregate(
+            total=Sum("items__amount")
+        )["total"]
+        or 0
     )
 
-    total_paid = customer.payments.aggregate(total=Sum("amount_paid"))["total"] or 0
+    total_paid = (
+        customer.payments.filter(is_voided=False).aggregate(total=Sum("amount_paid"))[
+            "total"
+        ]
+        or 0
+    )
 
     outstanding_balance = customer.opening_balance + total_udharo - total_paid
 
@@ -58,14 +70,14 @@ def annotate_balance(queryset):
     balance without an N+1 per row. Factored out of get_customers_with_balance
     so CustomerViewSet.get_queryset can reuse it."""
     udharo_sum = (
-        UdharoEntry.objects.filter(customer=OuterRef("pk"))
+        UdharoEntry.objects.filter(customer=OuterRef("pk"), is_voided=False)
         .values("customer")
         .annotate(total=Sum("items__amount"))
         .values("total")
     )
 
     payment_sum = (
-        Payment.objects.filter(customer=OuterRef("pk"))
+        Payment.objects.filter(customer=OuterRef("pk"), is_voided=False)
         .values("customer")
         .annotate(total=Sum("amount_paid"))
         .values("total")
@@ -110,6 +122,10 @@ def _debt_transactions_with_unpaid(customer, only_unpaid=True):
             customer=customer,
             txn_type__in=[Transaction.TxnType.OPENING, Transaction.TxnType.UDHARO],
         )
+        # A voided udharo entry is never a FIFO target and never counts as
+        # unpaid; OPENING transactions have no udharo_entry so they're
+        # untouched by this exclude.
+        .exclude(udharo_entry__is_voided=True)
         .annotate(
             allocated_amount=Coalesce(
                 Subquery(allocated_sum), Value(0), output_field=DecimalField()
@@ -167,8 +183,11 @@ def build_balance_after_map(customer_id):
     balance = 0
     balance_after_map = {}
 
-    transactions = Transaction.objects.filter(customer_id=customer_id).order_by(
-        "transaction_date", "created_at"
+    transactions = (
+        Transaction.objects.filter(customer_id=customer_id)
+        .exclude(udharo_entry__is_voided=True)
+        .exclude(payment__is_voided=True)
+        .order_by("transaction_date", "created_at")
     )
     for txn in transactions:
         if txn.txn_type == Transaction.TxnType.PAYMENT:
@@ -190,8 +209,11 @@ def build_running_totals_map(customer_id):
     credit_total = 0
     totals_map = {}
 
-    transactions = Transaction.objects.filter(customer_id=customer_id).order_by(
-        "transaction_date", "created_at"
+    transactions = (
+        Transaction.objects.filter(customer_id=customer_id)
+        .exclude(udharo_entry__is_voided=True)
+        .exclude(payment__is_voided=True)
+        .order_by("transaction_date", "created_at")
     )
     for txn in transactions:
         if txn.txn_type == Transaction.TxnType.PAYMENT:
@@ -216,20 +238,20 @@ def calculate_credit_score(customer):
     fifteen_days_ago = now - timedelta(days=15)
     score = 100
 
-    # Check overdue entries
+    # Check overdue entries (voided entries were never really owed)
     has_thirty_days_overdue = customer.udharo_entries.filter(
-        is_settled=False, created_at__lte=thirty_days_ago
+        is_settled=False, is_voided=False, created_at__lte=thirty_days_ago
     ).exists()
 
     has_fifteen_days_overdue = customer.udharo_entries.filter(
-        is_settled=False, created_at__lte=fifteen_days_ago
+        is_settled=False, is_voided=False, created_at__lte=fifteen_days_ago
     ).exists()
 
     outstanding = get_outstanding_balance(customer)
 
     # Apply deductions
     late_payment_count = customer.payments.filter(
-        created_at__gt=thirty_days_ago
+        created_at__gt=thirty_days_ago, is_voided=False
     ).count()
 
     score -= late_payment_count * 10
@@ -342,6 +364,59 @@ def sync_udharo_settlement(customer):
         )
 
 
+def void_udharo_entry(entry, *, reason=""):
+    """Void a udharo entry in place of deleting it: the row and its
+    Transaction audit trail stay visible (marked voided) but drop out of
+    every balance/credit-score calculation from here on.
+
+    Blocked if a payment has already been allocated against this entry —
+    voiding it out from under an existing allocation would leave that
+    payment pointing at debt that no longer counts toward anything. Void or
+    reallocate that payment first.
+
+    Call this from inside the caller's own transaction.atomic() block."""
+    debt_txn = Transaction.objects.get(udharo_entry=entry)
+    allocated = get_allocated_amount(debt_txn)
+    if allocated > 0:
+        raise ValidationError(
+            f"Cannot void this udharo entry; Rs.{allocated} is already paid "
+            f"against it. Void or edit that payment first."
+        )
+
+    entry.is_voided = True
+    entry.voided_at = timezone.now()
+    entry.void_reason = reason
+    entry.save(update_fields=["is_voided", "voided_at", "void_reason"])
+
+    debt_txn.status = "voided"
+    debt_txn.save(update_fields=["status"])
+
+    sync_udharo_settlement(entry.customer)
+    calculate_credit_score(entry.customer)
+
+
+def void_payment(payment, *, reason=""):
+    """Void a payment in place of deleting it: the row and its Transaction
+    audit trail stay visible (marked voided), and its allocations are
+    reversed — whatever debts it had paid off reopen — before it drops out
+    of every balance/credit-score calculation.
+
+    Call this from inside the caller's own transaction.atomic() block."""
+    payment_txn = Transaction.objects.get(payment=payment)
+    Allocation.objects.filter(payment_transaction=payment_txn).delete()
+
+    payment.is_voided = True
+    payment.voided_at = timezone.now()
+    payment.void_reason = reason
+    payment.save(update_fields=["is_voided", "voided_at", "void_reason"])
+
+    payment_txn.status = "voided"
+    payment_txn.save(update_fields=["status"])
+
+    sync_udharo_settlement(payment.customer)
+    calculate_credit_score(payment.customer)
+
+
 def get_customers_with_balance(user):
 
     now = timezone.now()
@@ -358,6 +433,7 @@ def get_customers_with_balance(user):
                 UdharoEntry.objects.filter(
                     customer=OuterRef("pk"),
                     is_settled=False,
+                    is_voided=False,
                     created_at__lte=thirty_days_ago,
                 )
             ),
@@ -365,6 +441,7 @@ def get_customers_with_balance(user):
                 UdharoEntry.objects.filter(
                     customer=OuterRef("pk"),
                     is_settled=False,
+                    is_voided=False,
                     created_at__lte=fifteen_days_ago,
                 )
             ),

@@ -21,6 +21,13 @@ class UdharoEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     settled_at = models.DateTimeField(null=True, blank=True)
 
+    # Voided rows are never deleted — they stay visible in the customer's
+    # statement/transaction list (marked voided) but are excluded from every
+    # balance and credit-score calculation. See tasks.services.void_udharo_entry.
+    is_voided = models.BooleanField(default=False)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.TextField(blank=True)
+
     class Meta:
         ordering = ["-created_at"]
 
@@ -71,6 +78,12 @@ class Payment(models.Model):
     # created_at (below) is when the row was entered into the system.
     transaction_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Voided rows are never deleted — see UdharoEntry.is_voided above and
+    # tasks.services.void_payment.
+    is_voided = models.BooleanField(default=False)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-created_at"]

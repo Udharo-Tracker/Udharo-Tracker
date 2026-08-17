@@ -4,7 +4,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 
-# from ....mailers.password_reset_email import send_password_reset_email
+from ..mailers import send_password_reset_email
 from ..models import User
 
 
@@ -68,7 +68,7 @@ class UserForgotPasswordSerializer(serializers.Serializer):
         user = self.validated_data["email"]
         if user is None:
             return
-        # send_password_reset_email(user, self.context.get("request"))
+        send_password_reset_email(user)
 
 
 class UserPasswordResetSerializer(serializers.Serializer):
