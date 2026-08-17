@@ -7,10 +7,18 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from apps.account.api.v1.authentication import CustomTokenObtainPairView 
-from apps.account.api.v1.register import UserRegisterViewSet 
-from apps.account.api.v1.password import UserForgotPasswordViewSet, UserPasswordResetViewSet, UserUpdatePasswordViewSet 
+from apps.account.api.v1.authentication import CustomTokenObtainPairView
+from apps.account.api.v1.register import UserRegisterViewSet
+from apps.account.api.v1.password import (
+    UserForgotPasswordViewSet,
+    UserPasswordResetViewSet,
+    UserUpdatePasswordViewSet,
+)
 from apps.account.api.v1.profile import UserProfileViewSet
+from apps.account.api.v1.email_verification import (
+    EmailVerifyView,
+    ResendVerificationEmailView,
+)
 
 router = DefaultRouter()
 
@@ -33,8 +41,6 @@ urlpatterns = [
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("auth/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
-
-
     # user
     path("user/profile/", UserProfileViewSet.as_view(), name="user-profile"),
     path(
@@ -51,6 +57,16 @@ urlpatterns = [
         "user/password/reset/",
         UserPasswordResetViewSet.as_view(),
         name="user-password-reset",
+    ),
+    path(
+        "user/verify-email/",
+        EmailVerifyView.as_view(),
+        name="user-verify-email",
+    ),
+    path(
+        "user/verify-email/resend/",
+        ResendVerificationEmailView.as_view(),
+        name="user-verify-email-resend",
     ),
     # path(
     #     "user/deactivate/",
