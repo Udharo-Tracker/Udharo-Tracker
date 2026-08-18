@@ -113,6 +113,7 @@ class ReminderLog(models.Model):
     class Channel(models.TextChoices):
         NOTE = "note", "Note"
         SMS = "sms", "SMS"
+        WHATSAPP = "whatsapp", "WhatsApp"
         AUTO = "auto", "Automatic"
 
     customer = models.ForeignKey(

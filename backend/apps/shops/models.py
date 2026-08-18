@@ -38,6 +38,10 @@ class Customer(models.Model):
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Opt-in: when True (and credit_limit > 0), new udharo entries that would
+    # push this customer's outstanding balance past credit_limit are
+    # rejected outright instead of just triggering a notification.
+    block_over_credit_limit = models.BooleanField(default=False)
     credit_term_days = models.PositiveIntegerField(default=0)
     loyalty_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     opening_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)

@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.db import transaction
 from rest_framework import viewsets, permissions
 from rest_framework.exceptions import ValidationError
+from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
@@ -66,8 +67,10 @@ from apps.ledger.tasks.services import (
 )
 class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = CustomerFilter
+    ordering_fields = ["name", "credit_limit", "opening_balance", "created_at"]
+    ordering = ["-created_at"]
 
     def get_serializer_class(self):
         # List rows are plain customer fields only — no ledger_summary — so

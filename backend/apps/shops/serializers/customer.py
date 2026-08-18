@@ -13,6 +13,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "email",
             "address",
             "credit_limit",
+            "block_over_credit_limit",
             "credit_term_days",
             "loyalty_discount",
             "opening_balance",

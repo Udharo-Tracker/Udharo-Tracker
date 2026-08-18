@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import timedelta
 
+from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
@@ -12,6 +13,7 @@ from apps.ledger.models import Payment, UdharoEntry, UdharoEntryItem
 from apps.ledger.tasks.services import calculate_credit_score
 
 from .models import Notification
+from .tasks import send_daily_digests
 
 
 def make_user_with_shop(email="owner@example.com"):
@@ -183,3 +185,69 @@ class NotificationAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class NotificationEmailTests(TestCase):
+    """Only CRITICAL_NOTIF_TYPES (credit_risk_red, credit_limit_exceeded)
+    get an immediate email — everything else stays in-app-only until the
+    daily digest picks it up (see DailyDigestTaskTests)."""
+
+    def setUp(self):
+        self.user, self.shop = make_user_with_shop()
+        self.customer = Customer.objects.create(shop=self.shop, name="Ram")
+        mail.outbox.clear()  # discard the customer_added notification's (non-)email
+
+    def test_customer_added_does_not_send_email(self):
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_credit_risk_red_sends_immediate_email(self):
+        entry = UdharoEntry.objects.create(customer=self.customer)
+        UdharoEntryItem.objects.create(
+            entry=entry, item_name="Rice", amount=Decimal("500")
+        )
+        UdharoEntry.objects.filter(pk=entry.pk).update(
+            created_at=timezone.now() - timedelta(days=31)
+        )
+        for _ in range(3):
+            Payment.objects.create(customer=self.customer, amount_paid=Decimal("10"))
+        mail.outbox.clear()
+
+        calculate_credit_score(self.customer)  # -> red (see ledger tests)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.user.email, mail.outbox[0].to)
+
+    def test_credit_limit_exceeded_sends_immediate_email(self):
+        self.customer.credit_limit = Decimal("300")
+        self.customer.save(update_fields=["credit_limit"])
+        mail.outbox.clear()
+
+        entry = UdharoEntry.objects.create(customer=self.customer)
+        UdharoEntryItem.objects.create(
+            entry=entry, item_name="Rice", amount=Decimal("500")
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+
+
+class DailyDigestTaskTests(TestCase):
+    def setUp(self):
+        self.user, self.shop = make_user_with_shop()
+        self.customer = Customer.objects.create(shop=self.shop, name="Ram")
+        mail.outbox.clear()
+
+    def test_sends_digest_for_shop_with_unread_notifications(self):
+        result = send_daily_digests()
+
+        self.assertEqual(result["shops_emailed"], 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.user.email, mail.outbox[0].to)
+
+    def test_skips_shop_with_no_unread_notifications(self):
+        Notification.objects.filter(shop=self.shop).update(is_read=True)
+        mail.outbox.clear()
+
+        result = send_daily_digests()
+
+        self.assertEqual(result["shops_emailed"], 0)
+        self.assertEqual(len(mail.outbox), 0)

@@ -1,5 +1,6 @@
 from rest_framework import status, viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -12,6 +13,7 @@ from ...tasks.services import (
     calculate_credit_score,
     clear_ledger_cache,
     get_allocated_amount,
+    get_outstanding_balance,
     record_transaction,
     sync_udharo_settlement,
     void_udharo_entry,
@@ -66,8 +68,10 @@ from ...tasks.services import (
 class UdharoEntryViewSet(viewsets.ModelViewSet):
     serializer_class = UdharoEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = UdharoEntryFilter
+    ordering_fields = ["created_at", "settled_at"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         return UdharoEntry.objects.filter(customer__shop__owner=self.request.user)
@@ -80,6 +84,19 @@ class UdharoEntryViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             entry = serializer.save()
+
+            # Opt-in hard stop: credit_limit alone is advisory (see the
+            # credit_limit_exceeded notification signal) — this is only
+            # enforced when the shop owner has explicitly turned it on.
+            if customer.block_over_credit_limit and customer.credit_limit > 0:
+                outstanding = get_outstanding_balance(customer)
+                if outstanding > customer.credit_limit:
+                    raise ValidationError(
+                        f"This entry would put {customer.name}'s outstanding "
+                        f"balance at Rs.{outstanding}, over their Rs."
+                        f"{customer.credit_limit} credit limit."
+                    )
+
             calculate_credit_score(customer)
             record_transaction(
                 customer=customer,

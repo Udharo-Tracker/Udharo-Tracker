@@ -11,7 +11,13 @@ from apps.ledger.api.v1.CreditScore import (
 )
 from apps.ledger.api.v1.Dashboard import DashboardView
 from apps.ledger.api.v1.monthlyReport import MonthlyReportView
-from apps.ledger.api.v1.ReminderLog import ReminderLogView, ReminderSMSView
+from apps.ledger.api.v1.monthlyReportPdf import MonthlyReportPDFView
+from apps.ledger.api.v1.ReminderLog import (
+    ReminderLogView,
+    ReminderSMSView,
+    ReminderWhatsAppView,
+)
+from apps.ledger.api.v1.statementPdf import CustomerStatementPDFView
 from apps.ledger.api.v1.transaction import TransactionListView, TransactionDetailView
 
 router = DefaultRouter()
@@ -38,6 +44,16 @@ urlpatterns = [
     path("ledger/dashboard/", DashboardView.as_view(), name="dashboard"),
     path("ledger/monthly-report/", MonthlyReportView.as_view(), name="monthly-report"),
     path(
+        "ledger/monthly-report/pdf/",
+        MonthlyReportPDFView.as_view(),
+        name="monthly-report-pdf",
+    ),
+    path(
+        "customers/<uuid:customer_id>/statement/pdf/",
+        CustomerStatementPDFView.as_view(),
+        name="customer-statement-pdf",
+    ),
+    path(
         "customers/<uuid:customer_id>/reminders/",
         ReminderLogView.as_view(),
         name="reminder-log",
@@ -46,6 +62,11 @@ urlpatterns = [
         "customers/<uuid:customer_id>/reminders/sms/",
         ReminderSMSView.as_view(),
         name="reminder-sms",
+    ),
+    path(
+        "customers/<uuid:customer_id>/reminders/whatsapp/",
+        ReminderWhatsAppView.as_view(),
+        name="reminder-whatsapp",
     ),
     path(
         "ledger/transactions/", TransactionListView.as_view(), name="transaction-list"

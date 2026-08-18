@@ -307,3 +307,164 @@ class LedgerAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
         self.assertIn("count", response.data)
+
+    def test_payments_list_can_be_ordered(self):
+        self._create_payment("100")
+        self._create_payment("500")
+
+        response = self.client.get("/api/v1/payments/", {"ordering": "amount_paid"})
+
+        amounts = [Decimal(row["amount_paid"]) for row in response.data["results"]]
+        self.assertEqual(amounts, sorted(amounts))
+
+        response = self.client.get("/api/v1/payments/", {"ordering": "-amount_paid"})
+
+        amounts = [Decimal(row["amount_paid"]) for row in response.data["results"]]
+        self.assertEqual(amounts, sorted(amounts, reverse=True))
+
+    def test_whatsapp_reminder_creates_log_entry(self):
+        self.customer.phone = "9800000000"
+        self.customer.save(update_fields=["phone"])
+        self._create_udharo("500")
+
+        response = self.client.post(
+            f"/api/v1/customers/{self.customer.id}/reminders/whatsapp/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        from .models import ReminderLog
+
+        log = ReminderLog.objects.get(customer=self.customer)
+        self.assertEqual(log.channel, ReminderLog.Channel.WHATSAPP)
+        self.assertEqual(log.delivery_status, "sent")
+
+
+class CreditLimitHardStopTests(TestCase):
+    """credit_limit alone stays advisory (see the credit_limit_exceeded
+    notification) — the hard stop is opt-in via block_over_credit_limit."""
+
+    def setUp(self):
+        self.user, self.shop = make_user_with_shop()
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def _create_udharo(self, customer, amount):
+        payload = {
+            "customer_id": str(customer.id),
+            "items": [{"item_name": "Rice", "amount": amount}],
+        }
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post("/api/v1/udharo/", payload, format="json")
+
+    def test_blocks_entry_that_would_exceed_limit_when_opted_in(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ram",
+            credit_limit=Decimal("1000"),
+            block_over_credit_limit=True,
+        )
+        self._create_udharo(customer, "500")
+
+        response = self._create_udharo(customer, "600")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(get_outstanding_balance(customer), Decimal("500"))
+
+    def test_allows_entry_over_limit_when_not_opted_in(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ram",
+            credit_limit=Decimal("1000"),
+            block_over_credit_limit=False,
+        )
+        self._create_udharo(customer, "500")
+
+        response = self._create_udharo(customer, "600")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(get_outstanding_balance(customer), Decimal("1100"))
+
+    def test_entry_within_limit_is_allowed(self):
+        customer = Customer.objects.create(
+            shop=self.shop,
+            name="Ram",
+            credit_limit=Decimal("1000"),
+            block_over_credit_limit=True,
+        )
+
+        response = self._create_udharo(customer, "500")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class PDFExportTests(TestCase):
+    def setUp(self):
+        self.user, self.shop = make_user_with_shop("owner@example.com")
+        self.other_user, self.other_shop = make_user_with_shop("intruder@example.com")
+        self.customer = Customer.objects.create(shop=self.shop, name="Ram")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def _create_udharo(self, amount="500"):
+        payload = {
+            "customer_id": str(self.customer.id),
+            "items": [{"item_name": "Rice", "amount": amount}],
+        }
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post("/api/v1/udharo/", payload, format="json")
+
+    def test_customer_statement_pdf(self):
+        self._create_udharo("500")
+        self._create_payment_direct("200")
+
+        response = self.client.get(
+            f"/api/v1/customers/{self.customer.id}/statement/pdf/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def _create_payment_direct(self, amount):
+        return self.client.post(
+            "/api/v1/payments/",
+            {"customer_id": str(self.customer.id), "amount_paid": amount},
+            format="json",
+        )
+
+    def test_cannot_download_another_shops_customer_statement(self):
+        self.client.force_authenticate(self.other_user)
+
+        response = self.client.get(
+            f"/api/v1/customers/{self.customer.id}/statement/pdf/"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_monthly_report_pdf_year_summary(self):
+        self._create_udharo("500")
+
+        response = self.client.get(
+            "/api/v1/ledger/monthly-report/pdf/", {"year": timezone.now().year}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_monthly_report_pdf_month_detail(self):
+        self._create_udharo("500")
+        now = timezone.now()
+
+        response = self.client.get(
+            "/api/v1/ledger/monthly-report/pdf/",
+            {"year": now.year, "month": now.month},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_monthly_report_pdf_requires_year(self):
+        response = self.client.get("/api/v1/ledger/monthly-report/pdf/")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
