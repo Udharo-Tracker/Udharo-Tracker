@@ -209,6 +209,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.ledger.tasks.creditScore.recalculate_all_credit_scores",
         "schedule": crontab(hour=0, minute=0),  # runs daily at midnight
     },
+    "send-notification-digests-daily": {
+        "task": "apps.notifications.tasks.send_daily_digests",
+        "schedule": crontab(
+            hour=8, minute=0
+        ),  # 8:00 AM Asia/Kathmandu, before reminders
+    },
 }
 
 # Dotted path to the SMS backend class used by apps.ledger.services.sms.send_sms().
@@ -217,6 +223,15 @@ CELERY_BEAT_SCHEDULE = {
 # once a provider is chosen.
 SMS_BACKEND = config(
     "SMS_BACKEND", default="apps.ledger.services.sms.ConsoleSMSBackend"
+)
+
+# Dotted path to the WhatsApp backend class used by
+# apps.ledger.services.whatsapp.send_whatsapp(). Same pluggable-backend
+# shape as SMS_BACKEND above — defaults to the free console backend.
+# Swap in a real WhatsApp Business API client once a provider is chosen.
+WHATSAPP_BACKEND = config(
+    "WHATSAPP_BACKEND",
+    default="apps.ledger.services.whatsapp.ConsoleWhatsAppBackend",
 )
 
 # EMAIL — used for account verification and password-reset links.
