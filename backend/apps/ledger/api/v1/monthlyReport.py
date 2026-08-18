@@ -4,7 +4,12 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncMonth, TruncDate
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, OpenApiExample
+from drf_spectacular.utils import (
+    extend_schema,
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiExample,
+)
 from drf_spectacular.types import OpenApiTypes
 
 import calendar
@@ -16,7 +21,9 @@ from ...models import UdharoEntry, Payment
     tags=["Monthly Reports"],
     parameters=[
         OpenApiParameter("year", int, description="Year (required)", required=True),
-        OpenApiParameter("month", int, description="Month 1-12 (optional — omit for yearly summary)"),
+        OpenApiParameter(
+            "month", int, description="Month 1-12 (optional — omit for yearly summary)"
+        ),
     ],
     responses=OpenApiResponse(
         response=OpenApiTypes.OBJECT,
@@ -98,7 +105,8 @@ class MonthlyReportView(APIView):
 
         return Response(self._year_summary(request.user, year))
 
-    def _year_summary(self, user, year):
+    @staticmethod
+    def _year_summary(user, year):
         udharo_by_month = (
             UdharoEntry.objects.filter(
                 customer__shop__owner=user,
@@ -120,11 +128,17 @@ class MonthlyReportView(APIView):
         )
 
         udharo_map = {
-            r["month"].month: {"total_udharo": r["total_udharo"] or 0, "entry_count": r["entry_count"] or 0}
+            r["month"].month: {
+                "total_udharo": r["total_udharo"] or 0,
+                "entry_count": r["entry_count"] or 0,
+            }
             for r in udharo_by_month
         }
         payment_map = {
-            r["month"].month: {"total_payments": r["total_payments"] or 0, "payment_count": r["payment_count"] or 0}
+            r["month"].month: {
+                "total_payments": r["total_payments"] or 0,
+                "payment_count": r["payment_count"] or 0,
+            }
             for r in payments_by_month
         }
 
@@ -136,15 +150,17 @@ class MonthlyReportView(APIView):
             p = payment_map.get(m, {"total_payments": 0, "payment_count": 0})
             total_udharo += u["total_udharo"]
             total_payments += p["total_payments"]
-            months.append({
-                "month": m,
-                "month_name": calendar.month_name[m],
-                "total_udharo": u["total_udharo"],
-                "total_payments": p["total_payments"],
-                "net": u["total_udharo"] - p["total_payments"],
-                "entry_count": u["entry_count"],
-                "payment_count": p["payment_count"],
-            })
+            months.append(
+                {
+                    "month": m,
+                    "month_name": calendar.month_name[m],
+                    "total_udharo": u["total_udharo"],
+                    "total_payments": p["total_payments"],
+                    "net": u["total_udharo"] - p["total_payments"],
+                    "entry_count": u["entry_count"],
+                    "payment_count": p["payment_count"],
+                }
+            )
 
         return {
             "year": year,
@@ -156,7 +172,8 @@ class MonthlyReportView(APIView):
             },
         }
 
-    def _month_detail(self, user, year, month):
+    @staticmethod
+    def _month_detail(user, year, month):
         udharo_by_day = (
             UdharoEntry.objects.filter(
                 customer__shop__owner=user,
@@ -180,11 +197,17 @@ class MonthlyReportView(APIView):
         )
 
         udharo_map = {
-            r["day"]: {"total_udharo": r["total_udharo"] or 0, "entry_count": r["entry_count"] or 0}
+            r["day"]: {
+                "total_udharo": r["total_udharo"] or 0,
+                "entry_count": r["entry_count"] or 0,
+            }
             for r in udharo_by_day
         }
         payment_map = {
-            r["day"]: {"total_payments": r["total_payments"] or 0, "payment_count": r["payment_count"] or 0}
+            r["day"]: {
+                "total_payments": r["total_payments"] or 0,
+                "payment_count": r["payment_count"] or 0,
+            }
             for r in payments_by_day
         }
 
@@ -197,14 +220,16 @@ class MonthlyReportView(APIView):
             p = payment_map.get(day, {"total_payments": 0, "payment_count": 0})
             total_udharo += u["total_udharo"]
             total_payments += p["total_payments"]
-            daily_breakdown.append({
-                "date": day.isoformat(),
-                "total_udharo": u["total_udharo"],
-                "total_payments": p["total_payments"],
-                "net": u["total_udharo"] - p["total_payments"],
-                "entry_count": u["entry_count"],
-                "payment_count": p["payment_count"],
-            })
+            daily_breakdown.append(
+                {
+                    "date": day.isoformat(),
+                    "total_udharo": u["total_udharo"],
+                    "total_payments": p["total_payments"],
+                    "net": u["total_udharo"] - p["total_payments"],
+                    "entry_count": u["entry_count"],
+                    "payment_count": p["payment_count"],
+                }
+            )
 
         return {
             "year": year,
