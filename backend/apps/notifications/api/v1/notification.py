@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -50,8 +51,10 @@ from ...serializers import NotificationSerializer
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = NotificationFilter
+    ordering_fields = ["created_at", "is_read"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         return Notification.objects.filter(shop__owner=self.request.user)
