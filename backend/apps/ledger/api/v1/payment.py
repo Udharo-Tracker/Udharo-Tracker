@@ -1,5 +1,6 @@
 from rest_framework import status, viewsets, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
@@ -67,8 +68,10 @@ from ...tasks.services import (
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = PaymentFilter
+    ordering_fields = ["amount_paid", "transaction_date", "created_at"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         return Payment.objects.filter(customer__shop__owner=self.request.user)

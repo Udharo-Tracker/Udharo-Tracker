@@ -1,6 +1,7 @@
 from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -90,8 +91,10 @@ def _with_allocated_amount(queryset):
 class TransactionListView(generics.ListAPIView):
     serializer_class = TransactionListSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = TransactionFilter
+    ordering_fields = ["transaction_date", "created_at", "amount", "txn_number"]
+    ordering = ["-transaction_date", "-created_at"]
 
     def get_queryset(self):
         return Transaction.objects.filter(
