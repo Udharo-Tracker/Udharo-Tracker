@@ -12,6 +12,7 @@ from ...filters import ReminderLogFilter
 from ...serializers.ReminderLog import ReminderLogSerializer
 from ...tasks.services import get_outstanding_balance
 from ...services.sms import send_sms
+from ...services.whatsapp import send_whatsapp
 
 
 class ReminderLogView(APIView):
@@ -147,6 +148,59 @@ class ReminderSMSView(APIView):
             outstanding_balance=outstanding_balance,
             note=message,
             channel=ReminderLog.Channel.SMS,
+            delivery_status="sent" if result["success"] else "failed",
+        )
+
+        serializer = ReminderLogSerializer(reminder)
+        response_status = (
+            status.HTTP_201_CREATED
+            if result["success"]
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        return Response(serializer.data, status=response_status)
+
+
+class ReminderWhatsAppView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=["Reminder Log"],
+        request=None,
+        responses=ReminderLogSerializer,
+        description="Sends a WhatsApp reminder to the customer for their current outstanding balance.",
+    )
+    def post(self, request, customer_id):
+        customer = get_object_or_404(Customer, id=customer_id)
+
+        if customer.shop.owner != request.user:
+            raise PermissionDenied()
+
+        if not customer.phone:
+            return Response(
+                {"detail": "Customer has no phone number on file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        outstanding_balance = get_outstanding_balance(customer)
+
+        if outstanding_balance <= 0:
+            return Response(
+                {"detail": "Customer has no outstanding balance."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        message = (
+            f"Dear {customer.name}, your outstanding balance at {customer.shop.name} "
+            f"is Rs.{outstanding_balance}. Please clear it soon. Thank you."
+        )
+
+        result = send_whatsapp(customer.phone, message)
+
+        reminder = ReminderLog.objects.create(
+            customer=customer,
+            outstanding_balance=outstanding_balance,
+            note=message,
+            channel=ReminderLog.Channel.WHATSAPP,
             delivery_status="sent" if result["success"] else "failed",
         )
 
